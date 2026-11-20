@@ -1,0 +1,20 @@
+# Gradle
+build/
+.gradle/
+
+# Testovací svět a běhy (./gradlew runClient / runServer)
+runs/
+run/
+
+# IDE
+out/
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+bin/
+
+# macOS
+.DS_Store
