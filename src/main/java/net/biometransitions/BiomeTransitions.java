@@ -5,7 +5,10 @@ import com.mojang.serialization.MapCodec;
 import net.biometransitions.config.BtgConfig;
 import net.biometransitions.core.BiomeClassifier;
 import net.biometransitions.core.BoundaryDetector;
+import net.biometransitions.core.BiomeReplacer;
+import net.biometransitions.core.Density;
 import net.biometransitions.core.FeatureCatalog;
+import net.biometransitions.core.Mixing;
 import net.biometransitions.debug.BoundaryVisualizer;
 import net.biometransitions.debug.BtgCommands;
 import net.biometransitions.worldgen.StepConfig;
@@ -69,5 +72,8 @@ public final class BiomeTransitions {
         BoundaryDetector.clear();
         BiomeClassifier.clear();
         FeatureCatalog.clear();
+        Mixing.clear();
+        Density.clear();
+        BiomeReplacer.clear();
     }
 }

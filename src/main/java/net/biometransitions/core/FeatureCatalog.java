@@ -100,22 +100,24 @@ public final class FeatureCatalog {
     }
 
     /** Reason the entry may not cross this particular boundary (step null = any step), or null. */
-    public static String rejectFor(Entry e, Decoration step, BtgConfig.TransitionSettings s, Holder<Biome> target) {
+    public static String rejectFor(Entry e, Decoration step, Holder<Biome> target) {
         BtgConfig cfg = BtgConfig.get();
+        var a = cfg.advanced;
         if (e.rejectReason != null) return e.rejectReason;
         if (step != null && !cfg.features.enabledSteps.contains(step.name())) return "step " + step.name() + " disabled";
-        if (e.fluidChannel() ? !cfg.general.fluidTransitions : !cfg.general.vegetationTransitions) return "channel disabled";
-        if (!s.selection.allowedCategories.contains(e.category)) return "category " + e.category + " not allowed";
-        if (s.selection.excludedFeatures.contains(e.id)) return "excluded in selection settings";
-        if (e.category.equals("fluid") && !s.fluid.allowFluidBodies) return "fluid bodies disabled";
+        if (e.fluidChannel() ? !a.fluidTransitions : !a.vegetationTransitions) return "channel disabled";
+        if (!a.selection.allowedCategories.contains(e.category)) return "category " + e.category + " not allowed";
+        if (a.selection.excludedFeatures.contains(e.id)) return "excluded in selection settings";
+        if (e.category.equals("fluid") && !a.fluid.allowFluidBodies) return "fluid bodies disabled";
         if (target != null && !BiomeClassifier.matchesAny(e.settings.allowedBiomes, target)) return "target biome not allowed";
         if (target != null && target.value().getGenerationSettings().hasFeature(e.feature.value())) return "target biome already has it";
         return null;
     }
 
     /** Density multiplier from the transition settings (selection + category + feature + fluid channel). */
-    public static double frequency(Entry e, BtgConfig.TransitionSettings s) {
-        double f = s.selection.frequency * s.selection.categoryFrequency.getOrDefault(e.category, 1.0) * e.settings.frequency;
-        return e.fluidChannel() ? f * s.fluid.frequency : f;
+    public static double frequency(Entry e) {
+        var a = BtgConfig.get().advanced;
+        double f = a.selection.frequency * a.selection.categoryFrequency.getOrDefault(e.category, 1.0) * e.settings.frequency;
+        return e.fluidChannel() ? f * a.fluid.frequency : f;
     }
 }

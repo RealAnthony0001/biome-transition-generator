@@ -46,14 +46,48 @@ public final class BiomeClassifier {
         return rl != null && biome.is(TagKey.create(Registries.BIOME, rl));
     }
 
-    /** Selector: "*" = 0, "#category" = 1, biome id = 2, no match = -1. */
+    /**
+     * Selector -> specificity, or -1 for no match. Accepts:
+     * {@code all}/{@code *} (0), group names like {@code forest} or legacy {@code #forest} (1),
+     * {@code surface}/{@code underground} (1), biome tags {@code #minecraft:is_ocean} (1), biome ids (2),
+     * and unions {@code desert+badlands} (best part).
+     */
     public static int match(String selector, Holder<Biome> biome) {
-        if (selector == null || selector.isEmpty() || selector.equals("*")) return 0;
-        if (selector.startsWith("#")) return categories(biome).contains(selector.substring(1)) ? 1 : -1;
-        return selector.equals(id(biome)) ? 2 : -1;
+        if (selector == null) return 0;
+        selector = selector.trim();
+        if (selector.isEmpty() || selector.equals("*") || selector.equals("all")) return 0;
+        if (selector.contains("+")) {
+            int best = -1;
+            for (String part : selector.split("\\+")) if (!part.isBlank()) best = Math.max(best, match(part, biome));
+            return best;
+        }
+        if (selector.equals("surface")) return categories(biome).contains("underground") ? -1 : 1;
+        boolean tag = selector.startsWith("#");
+        String name = tag ? selector.substring(1) : selector;
+        if (name.contains(":")) {
+            if (tag) return hasTag(biome, name) ? 1 : -1;
+            return name.equals(id(biome)) ? 2 : -1;
+        }
+        return categories(biome).contains(name) ? 1 : -1;
     }
 
     public static boolean matchesAny(List<String> selectors, Holder<Biome> biome) {
         return selectors.isEmpty() || selectors.stream().anyMatch(s -> match(s, biome) >= 0);
+    }
+
+    /** Like {@link #matchesAny}, but an empty list matches nothing. */
+    public static boolean listed(List<String> selectors, Holder<Biome> biome) {
+        return !selectors.isEmpty() && matchesAny(selectors, biome);
+    }
+
+    /** The first selector of the list that matches, or null. */
+    public static String firstMatch(List<String> selectors, Holder<Biome> biome) {
+        for (String s : selectors) if (match(s, biome) >= 0) return s;
+        return null;
+    }
+
+    public static boolean shareGroup(Holder<Biome> a, Holder<Biome> b) {
+        for (String c : categories(a)) if (!c.equals("other") && categories(b).contains(c)) return true;
+        return false;
     }
 }

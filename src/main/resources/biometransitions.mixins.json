@@ -3,6 +3,7 @@
   "minVersion": "0.8",
   "package": "net.biometransitions.mixin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": ["BiomeFilterMixin"],
+  "mixins": ["BiomeFilterMixin", "NoiseBasedChunkGeneratorMixin"],
+  "client": ["ClientLevelMixin"],
   "injectors": { "defaultRequire": 1 }
 }

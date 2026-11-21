@@ -3,6 +3,7 @@ package net.biometransitions.worldgen;
 import net.biometransitions.config.BtgConfig;
 import net.biometransitions.core.BoundaryDetector;
 import net.biometransitions.core.FeatureCatalog;
+import net.biometransitions.core.Mixing;
 import net.biometransitions.core.SurfaceRules;
 import net.biometransitions.core.TransitionMath;
 import net.biometransitions.core.Transitions;
@@ -92,7 +93,7 @@ public class TransitionFeature extends Feature<StepConfig> {
             out.add((h - 1) >> 4);
             top = Math.max(top, h >> 4);
         }
-        if (cfg.general.undergroundTransitions)
+        if (cfg.advanced.undergroundTransitions)
             for (int s = level.getMinSection(); s < top; s += cfg.performance.undergroundSectionStride) out.add(s);
         return out;
     }
@@ -102,16 +103,24 @@ public class TransitionFeature extends Feature<StepConfig> {
         WorldgenRandom rand = new WorldgenRandom(new XoroshiroRandomSource(seed));
         long decorationSeed = rand.setDecorationSeed(seed, origin.getX(), origin.getZ());
         List<Candidate> out = new ArrayList<>();
-        var s = cfg.transition;
+        var fluid = cfg.advanced.fluid;
         for (Holder<Biome> source : foreign) {
             for (FeatureCatalog.Entry e : FeatureCatalog.all(source, step)) {
                 // Cheap rejections first: running the placement pipeline is the expensive part.
-                if (FeatureCatalog.rejectFor(e, step, s, null) != null) continue;
-                if (owns.stream().allMatch(b -> b.value().getGenerationSettings().hasFeature(e.feature().value()))) continue;
+                if (FeatureCatalog.rejectFor(e, step, null) != null) continue;
+                // Density/variety factor per biome of this chunk the feature may flow into; none = skip the feature.
+                Map<Holder<Biome>, Double> factors = new HashMap<>();
+                for (Holder<Biome> own : owns) {
+                    var rule = Mixing.between(own, source, e.fluidChannel());
+                    if (rule != null && !own.value().getGenerationSettings().hasFeature(e.feature().value()))
+                        factors.put(own, Mixing.featureFactor(e, step, source, own, rule));
+                }
+                double maxFactor = factors.values().stream().mapToDouble(Double::doubleValue).max().orElse(0);
+                if (maxFactor <= 0) continue;
                 // Frequency above 1 runs the feature's whole placement pipeline several times, so a zone can be
                 // denser than the source biome while every position still obeys the feature's own rules.
-                double shoreMax = !e.fluidChannel() && s.fluid.shoreCategories.contains(e.category()) ? Math.max(1, s.fluid.shoreFrequency) : 1;
-                int passes = Math.max(1, (int) Math.ceil(FeatureCatalog.frequency(e, s) * shoreMax));
+                double shoreMax = !e.fluidChannel() && fluid.shoreCategories.contains(e.category()) ? Math.max(1, fluid.shoreFrequency) : 1;
+                int passes = Math.max(1, (int) Math.ceil(FeatureCatalog.frequency(e) * maxFactor * shoreMax));
                 for (int pass = 0; pass < passes; pass++) {
                     rand.setFeatureSeed(decorationSeed, e.id().hashCode() * 31 + source.hashCode() + pass * 0x9E3779B9, step.ordinal());
                     Iterator<BlockPos> it = positions(e, level, gen, rand, origin).limit(e.settings().maxAttempts).iterator();
@@ -122,16 +131,18 @@ public class TransitionFeature extends Feature<StepConfig> {
                         var in = influences.stream().filter(i -> i.foreign().equals(source)).findFirst().orElse(null);
                         if (in == null) continue; // outside the zone: the biome filter would have said no as well
                         Holder<Biome> target = BoundaryDetector.zoneMap(gen, rs, seed, pos).own(pos.getX(), pos.getZ());
-                        String why = FeatureCatalog.rejectFor(e, step, s, target);
+                        String why = FeatureCatalog.rejectFor(e, step, target);
                         if (why != null) {
                             Stats.reject(e.id(), why);
                             continue;
                         }
-                        double p = in.share() * FeatureCatalog.frequency(e, s) / passes;
-                        if (!e.fluidChannel() && s.fluid.shoreRadius > 0 && s.fluid.shoreCategories.contains(e.category())
-                                && SurfaceRules.nearWater(level, pos, s.fluid.shoreRadius)) p *= s.fluid.shoreFrequency;
+                        Double factor = factors.get(target);
+                        if (factor == null) factor = Mixing.featureFactor(e, step, source, target, in.rule());
+                        double p = in.share() * FeatureCatalog.frequency(e) * factor / passes;
+                        if (!e.fluidChannel() && fluid.shoreRadius > 0 && fluid.shoreCategories.contains(e.category())
+                                && SurfaceRules.nearWater(level, pos, fluid.shoreRadius)) p *= fluid.shoreFrequency;
                         if (rand.nextDouble() >= p) continue;
-                        out.add(new Candidate(e, pos, TransitionMath.weightedKey(rand.nextDouble(), e.settings().weight), s.fluid));
+                        out.add(new Candidate(e, pos, TransitionMath.weightedKey(rand.nextDouble(), e.settings().weight), fluid));
                         if (out.size() >= cfg.performance.maxCandidatesPerChunk) return out;
                     }
                 }
@@ -167,6 +178,7 @@ public class TransitionFeature extends Feature<StepConfig> {
             String why = spacing(c, prev);
             WorldgenRandom r = new WorldgenRandom(new LegacyRandomSource(seed ^ c.pos.asLong() * 0x9E3779B97F4A7C15L ^ id.hashCode()));
             if (why == null) why = SurfaceRules.check(level, c.pos, c.entry, c.fluid, r);
+            if (why == null && cfg.advanced.preventFeatureOverlap && SurfaceRules.overlaps(level, c.pos)) why = "overlaps another feature";
             if (why != null) {
                 Stats.reject(id, why);
                 continue;

@@ -5,7 +5,9 @@ import com.mojang.brigadier.context.CommandContext;
 import net.biometransitions.config.BtgConfig;
 import net.biometransitions.core.BiomeClassifier;
 import net.biometransitions.core.BoundaryDetector;
+import net.biometransitions.core.BiomeReplacer;
 import net.biometransitions.core.FeatureCatalog;
+import net.biometransitions.core.Mixing;
 import net.biometransitions.core.Transitions;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -59,18 +61,21 @@ public final class BtgCommands {
         var ns = BoundaryDetector.zoneMap(gen, rs, seed, pos).neighbours(pos.getX(), pos.getZ());
         StringBuilder sb = new StringBuilder("Biome ").append(BiomeClassifier.id(own))
                 .append(' ').append(BiomeClassifier.categories(own)).append('\n');
-        if (ns.length == 0) sb.append("No boundary within ").append(BtgConfig.get().detection.maxDetectionDistance).append(" blocks.");
+        if (BiomeReplacer.featuresSuppressed(gen.getBiomeSource(), rs, pos.getX(), pos.getZ(), own))
+            sb.append("Small biome: own features suppressed, neighbours fill it.\n");
+        if (ns.length == 0) sb.append("No biome within ").append(Mixing.maxWidth()).append(" blocks that may mix in here.");
         var veg = Transitions.at(gen, rs, seed, pos, own, false);
         var fluid = Transitions.at(gen, rs, seed, pos, own, true);
         double foreignTotal = 0;
         for (var n : ns) {
-            var zone = BtgConfig.get().transition.zone;
             double vs = Transitions.shareOf(veg, n.biome()), fs = Transitions.shareOf(fluid, n.biome());
             foreignTotal += vs;
-            double width = zone.width * Transitions.climateFactor(own, n.biome(), zone.climateAdaptation);
-            sb.append(String.format("→ %s %s  %.1f blocks  zone %.1f blocks (climate-adjusted)  neighbour share %.0f%%  fluid %.0f%%%n",
-                    BiomeClassifier.id(n.biome()), BiomeClassifier.categories(n.biome()), n.distance(zone.shape),
-                    width, vs * 100, fs * 100));
+            var rule = Mixing.between(own, n.biome(), false);
+            sb.append(String.format("→ %s %s  %.1f blocks  %s  neighbour share %.0f%%  fluid %.0f%%%n",
+                    BiomeClassifier.id(n.biome()), BiomeClassifier.categories(n.biome()),
+                    n.distance(BtgConfig.get().mixing.distribution.shape),
+                    rule == null ? "does not mix into this biome" : String.format("zone %.0f blocks, %s", rule.width(), rule.curve()),
+                    vs * 100, fs * 100));
         }
         if (ns.length > 0) sb.append(String.format("Feature ratio own/foreign: %.0f / %.0f", (1 - foreignTotal) * 100, foreignTotal * 100));
         return say(c, sb.toString().trim());
@@ -78,11 +83,10 @@ public final class BtgCommands {
 
     private static int features(CommandContext<CommandSourceStack> c, Holder<Biome> biome) {
         if (biome == null) biome = c.getSource().getLevel().getBiome(BlockPos.containing(c.getSource().getPosition()));
-        var settings = BtgConfig.get().transition;
         StringBuilder sb = new StringBuilder("Features of ").append(BiomeClassifier.id(biome)).append(":\n");
         for (Decoration step : Decoration.values())
             for (var e : FeatureCatalog.all(biome, step)) {
-                String why = FeatureCatalog.rejectFor(e, step, settings, null);
+                String why = FeatureCatalog.rejectFor(e, step, null);
                 sb.append(why == null ? "✔ " : "✘ ").append(step.name().toLowerCase()).append(' ').append(e.id())
                         .append(" [").append(e.category()).append(", ").append(e.type()).append(']')
                         .append(e.hasBiomeFilter() ? " biome filter → zone share" : "")

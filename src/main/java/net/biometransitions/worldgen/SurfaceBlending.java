@@ -28,8 +28,9 @@ public final class SurfaceBlending {
     private SurfaceBlending() {}
 
     public static int apply(WorldGenLevel level, ChunkGenerator gen, RandomState rs, long seed, ChunkPos cp) {
-        var s = BtgConfig.get().transition.surface;
-        if (!s.enabled || s.intensity <= 0) return 0;
+        BtgConfig cfg = BtgConfig.get();
+        var s = cfg.mixing.surface;
+        if (!cfg.general.surfaceMixing || s.intensity <= 0) return 0;
         int changed = 0;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (int lx = 0; lx < 16; lx++)
@@ -46,7 +47,7 @@ public final class SurfaceBlending {
                 List<String> pair = null;
                 for (var i : influences) {
                     List<String> p = blocksFor(i.foreign(), s.blocks);
-                    if (p != null && !p.equals(ownPair) && (best == null || i.share() > best.share())) { best = i; pair = p; }
+                    if (i.rule().surface() && p != null && !p.equals(ownPair) && (best == null || i.share() > best.share())) { best = i; pair = p; }
                 }
                 if (best == null) continue;
                 // Patch noise in 0..1 against the share: big blobs near the border, scattered islands further out.

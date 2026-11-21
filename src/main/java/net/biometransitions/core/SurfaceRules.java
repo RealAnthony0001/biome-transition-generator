@@ -7,9 +7,11 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.feature.LakeFeature;
@@ -53,6 +55,16 @@ public final class SurfaceRules {
             if (!level.isEmptyBlock(pos.above(i))) return "no air space";
         if (s.maxSlope < 16 && slope(level, pos) > s.maxSlope) return "slope too steep";
         return null;
+    }
+
+    /**
+     * Prevent Feature Block Overlap: the spot itself is taken by a solid block, or it sits right on top of
+     * another feature (leaves, logs, a rock). Touching and overlapping crowns are not checked.
+     */
+    public static boolean overlaps(WorldGenLevel level, BlockPos pos) {
+        BlockState at = level.getBlockState(pos), below = level.getBlockState(pos.below());
+        if (!at.isAir() && !at.canBeReplaced()) return true;
+        return below.is(BlockTags.LEAVES) || below.is(BlockTags.LOGS) || below.is(Blocks.MOSSY_COBBLESTONE) || below.is(Blocks.COBBLESTONE);
     }
 
     /** Land features listed as shore categories get the shore multiplier next to water. */

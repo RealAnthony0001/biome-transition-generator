@@ -11,6 +11,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.Screen;
@@ -29,15 +30,15 @@ import java.util.Map;
  * exact value, booleans a toggle, enums a cycle button, string lists a comma-separated box.
  */
 public class ConfigScreen extends Screen {
-    private static final String[] SECTIONS = {"General Settings", "Boundary Detection", "Transition Zones",
-            "Feature Distribution", "Feature Selection", "Biome Classification",
-            "Fluid Transitions", "Surface Compatibility", "Performance", "Debugging"};
+    private static final String[] SECTIONS = {"General", "Boundary Detection", "Biome Mixing", "Biome Boundary Mixing",
+            "Biome Replacing", "Biome Color Blending", "Biome Classification", "Performance", "Advanced", "Debug"};
     private static final int SIDEBAR = 130, ROW_H = 24;
 
     private final Screen parent;
     private final BtgConfig working = BtgConfig.get().copy();
     private int section = 0;
     private RowList list;
+    private final java.util.Set<BtgConfig.PairRule> expanded = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 
     public ConfigScreen(Screen parent) {
         super(Component.literal("Biome Transition Generator"));
@@ -67,30 +68,63 @@ public class ConfigScreen extends Screen {
         switch (section) {
             case 0 -> addObject(working.general);
             case 1 -> addObject(working.detection);
-            case 2 -> addObject(working.transition.zone);
-            case 3 -> addObject(working.transition.distribution);
-            case 4 -> {
-                addObject(working.transition.selection);
-                list.add(new Header("Feature rules"));
-                addObject(working.features);
+            case 2 -> {
+                addObject(working.mixing, "surface");
+                list.add(new Header("━━ Surface Compatibility & Surface Block Blending ━━"));
+                list.add(new Note("Rules every mixed-in feature must meet; per category and per feature overrides are in JSON."));
+                addObject(working.featureDefaults);
+                list.add(new Header("Surface block blending"));
+                addObject(working.mixing.surface);
             }
+            case 3 -> pairs();
+            case 4 -> addObject(working.replacing);
             case 5 -> {
+                addField(working.general, "colorBlendDistance");
+                addObject(working.colors);
+            }
+            case 6 -> {
+                list.add(new Note("Groups: every biome gets groups from tags; special groups: all, surface, underground."));
                 addObject(working.classification);
-                list.add(new Header("Current tag rules (tags → categories)"));
+                list.add(new Header("Current tag rules (tags → groups)"));
                 for (var r : working.classification.tagRules)
                     list.add(new Note(String.join(" + ", r.tags) + " → " + String.join(", ", r.categories)));
             }
-            case 6 -> addObject(working.transition.fluid);
-            case 7 -> {
-                list.add(new Note("Defaults for every feature; per category and per feature overrides are in JSON."));
-                addObject(working.featureDefaults);
-                list.add(new Header("Surface block blending"));
-                addObject(working.transition.surface);
+            case 7 -> addObject(working.performance);
+            case 8 -> {
+                addObject(working.advanced);
+                list.add(new Header("Feature rules"));
+                addObject(working.features);
             }
-            case 8 -> addObject(working.performance);
             case 9 -> addObject(working.debug);
             default -> {}
         }
+    }
+
+    /** Biome Boundary Mixing: one expandable entry per pair of groups. */
+    private void pairs() {
+        list.add(new Note("Pairs not listed here mix by the global Biome Mixing settings. First matching pair wins."));
+        for (var p : working.pairs) {
+            boolean open = expanded.contains(p);
+            String name = (open ? "▼ " : "▶ ") + (p.a.isBlank() ? "?" : p.a) + " + " + (p.b.isBlank() ? "?" : p.b) + "   [" + p.mode + "]";
+            Button toggle = Button.builder(Component.literal(name), b -> {
+                if (!expanded.remove(p)) expanded.add(p);
+                rebuildWidgets();
+            }).size(300, 20).build();
+            Button remove = Button.builder(Component.literal("✕"), b -> {
+                working.pairs.remove(p);
+                rebuildWidgets();
+            }).size(20, 20).build();
+            remove.setTooltip(Tooltip.create(Component.literal("Remove this pair")));
+            list.add(new Row("", List.of(toggle, remove), null, 0));
+            if (open) addObject(p);
+        }
+        Button add = Button.builder(Component.literal("+ Add pair"), b -> {
+            var p = new BtgConfig.PairRule();
+            working.pairs.add(p);
+            expanded.add(p);
+            rebuildWidgets();
+        }).size(120, 20).build();
+        list.add(new Row("", List.of(add), null, 0));
     }
 
     private void save() {
@@ -110,23 +144,49 @@ public class ConfigScreen extends Screen {
 
     // ---- reflection ----
 
-    private void addObject(Object o) {
-        for (Field f : o.getClass().getFields()) {
-            if (Modifier.isStatic(f.getModifiers())) continue;
-            Class<?> t = f.getType();
-            String label = pretty(f.getName());
-            Range r = f.getAnnotation(Range.class);
-            if (r != null && (t == int.class || t == double.class)) list.add(new NumberRow(label, o, f, r));
-            else if (t == boolean.class) list.add(new Row(label, List.of(toggle(o, f))));
-            else if (t.isEnum()) list.add(new Row(label, List.of(cycle(o, f))));
-            else if (t == String.class) list.add(new Row(label, List.of(textBox(o, f, false))));
-            else if (List.class.isAssignableFrom(t) && listOf(f) != null) list.add(new Row(label, List.of(textBox(o, f, true))));
-            else if (Map.class.isAssignableFrom(t) || List.class.isAssignableFrom(t) || t == JsonObject.class)
-                list.add(new Note(label + ": edit in config/biometransitions.json"));
-            else if (t.getName().startsWith("net.biometransitions")) {
-                list.add(new Header(label));
-                addObject(get(o, f));
-            }
+    private void addObject(Object o, String... skip) {
+        for (Field f : o.getClass().getFields())
+            if (!Modifier.isStatic(f.getModifiers()) && !Arrays.asList(skip).contains(f.getName())) addField(o, f);
+    }
+
+    private void addField(Object o, String name) {
+        try {
+            addField(o, o.getClass().getField(name));
+        } catch (NoSuchFieldException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private void addField(Object o, Field f) {
+        Class<?> t = f.getType();
+        String label = pretty(f.getName());
+        String tip = tip(f);
+        Range r = f.getAnnotation(Range.class);
+        if (r != null && (t == int.class || t == double.class)) list.add(new NumberRow(label, o, f, r, tip));
+        else if (t == boolean.class) list.add(new Row(label, List.of(toggle(o, f)), tip));
+        else if (t.isEnum()) list.add(new Row(label, List.of(cycle(o, f, tip)), tip));
+        else if (t == String.class) list.add(new Row(label, List.of(textBox(o, f, false)), tip));
+        else if (List.class.isAssignableFrom(t) && listOf(f) != null) list.add(new Row(label, List.of(textBox(o, f, true)), tip));
+        else if (Map.class.isAssignableFrom(t) || List.class.isAssignableFrom(t) || t == JsonObject.class)
+            list.add(new Note(label + ": edit in config/biometransitions.json"));
+        else if (t.getName().startsWith("net.biometransitions")) {
+            list.add(new Header(label));
+            addObject(get(o, f));
+        }
+    }
+
+    private static String tip(Field f) {
+        BtgConfig.Tip t = f.getAnnotation(BtgConfig.Tip.class);
+        return t == null ? null : t.value();
+    }
+
+    /** Tooltip of an enum constant, or null. */
+    private static String tip(Object constant) {
+        if (constant == null) return "Use the global setting.";
+        try {
+            return tip(constant.getClass().getField(((Enum<?>) constant).name()));
+        } catch (NoSuchFieldException e) {
+            return null;
         }
     }
 
@@ -143,13 +203,27 @@ public class ConfigScreen extends Screen {
         }).size(80, 20).build();
     }
 
-    private Button cycle(Object o, Field f) {
-        return Button.builder(Component.literal(String.valueOf(get(o, f))), b -> {
-            Object[] values = f.getType().getEnumConstants();
-            Object next = values[(Arrays.asList(values).indexOf(get(o, f)) + 1) % values.length];
+    /** Cycles the enum values; fields marked {@link BtgConfig.Inherit} also cycle through null = "Global". */
+    private Button cycle(Object o, Field f, String fieldTip) {
+        List<Object> values = new ArrayList<>();
+        if (f.isAnnotationPresent(BtgConfig.Inherit.class)) values.add(null);
+        values.addAll(Arrays.asList(f.getType().getEnumConstants()));
+        Button button = Button.builder(Component.literal(name(get(o, f))), b -> {
+            Object next = values.get((values.indexOf(get(o, f)) + 1) % values.size());
             set(o, f, next);
-            b.setMessage(Component.literal(next.toString()));
-        }).size(120, 20).build();
+            b.setMessage(Component.literal(name(next)));
+            b.setTooltip(optionTip(fieldTip, next));
+        }).size(140, 20).build();
+        button.setTooltip(optionTip(fieldTip, get(o, f)));
+        return button;
+    }
+
+    private static String name(Object v) { return v == null ? "Global" : v.toString(); }
+
+    private static Tooltip optionTip(String fieldTip, Object value) {
+        String own = tip(value);
+        String text = (fieldTip == null ? "" : fieldTip + "\n\n") + name(value) + (own == null ? "" : ": " + own) + "\n(click for the next option)";
+        return Tooltip.create(Component.literal(text));
     }
 
     private EditBox textBox(Object o, Field f, boolean isList) {
@@ -205,16 +279,29 @@ public class ConfigScreen extends Screen {
     private class Row extends ContainerObjectSelectionList.Entry<Row> {
         final String label;
         final List<AbstractWidget> widgets;
+        final String tip;
+        final int indent;
 
-        Row(String label, List<AbstractWidget> widgets) {
+        Row(String label, List<AbstractWidget> widgets) { this(label, widgets, null); }
+
+        Row(String label, List<AbstractWidget> widgets, String tip) { this(label, widgets, tip, 150); }
+
+        /** @param indent where the widgets start, relative to the row */
+        Row(String label, List<AbstractWidget> widgets, String tip, int indent) {
             this.label = label;
             this.widgets = widgets;
+            this.tip = tip;
+            this.indent = indent;
+            if (tip != null)
+                for (AbstractWidget wd : widgets) if (wd.getTooltip() == null) wd.setTooltip(Tooltip.create(Component.literal(tip)));
         }
 
         @Override
         public void render(GuiGraphics g, int index, int top, int left, int w, int h, int mouseX, int mouseY, boolean hovered, float pt) {
             g.drawString(font, label, left, top + 6, 0xE0E0E0);
-            int x = left + 150;
+            if (tip != null && hovered && mouseX < left + indent - 4)
+                setTooltipForNextRenderPass(font.split(Component.literal(tip), 260));
+            int x = left + indent;
             for (AbstractWidget wd : widgets) {
                 wd.setPosition(x, top + (wd instanceof EditBox ? 1 : 0));
                 wd.render(g, mouseX, mouseY, pt);
@@ -254,8 +341,8 @@ public class ConfigScreen extends Screen {
         private final Slider slider;
         private final EditBox box;
 
-        NumberRow(String label, Object o, Field f, Range range) {
-            super(label, new ArrayList<>());
+        NumberRow(String label, Object o, Field f, Range range, String tip) {
+            super(label, new ArrayList<>(), tip);
             this.range = range;
             this.integer = f.getType() == int.class;
             double v = ((Number) get(o, f)).doubleValue();
@@ -277,6 +364,11 @@ public class ConfigScreen extends Screen {
             });
             widgets.add(slider);
             widgets.add(box);
+            String limits = "\n\nLeft end: " + (range.minLabel().isEmpty() ? format(range.min()) : range.minLabel() + " (" + format(range.min()) + ")")
+                    + "\nRight end: " + format(range.max()) + "\nType an exact value in the box.";
+            Tooltip t = Tooltip.create(Component.literal((tip == null ? label : tip) + limits));
+            slider.setTooltip(t);
+            box.setTooltip(t);
         }
 
         String format(double v) {
@@ -287,7 +379,7 @@ public class ConfigScreen extends Screen {
         public void render(GuiGraphics g, int index, int top, int left, int w, int h, int mouseX, int mouseY, boolean hovered, float pt) {
             super.render(g, index, top, left, w, h, mouseX, mouseY, hovered, pt);
             String unit = range.unit().isEmpty() ? "" : " " + range.unit();
-            g.drawString(font, "§8" + format(range.min()) + " – " + format(range.max()) + unit, left + 150 + 160 + 4 + 56 + 6, top + 6, 0xFFFFFF);
+            g.drawString(font, "§8" + (range.minLabel().isEmpty() ? format(range.min()) : range.minLabel()) + " – " + format(range.max()) + unit, left + 150 + 160 + 4 + 56 + 6, top + 6, 0xFFFFFF);
         }
 
         private class Slider extends AbstractSliderButton {
@@ -315,7 +407,8 @@ public class ConfigScreen extends Screen {
             @Override
             protected void updateMessage() {
                 String unit = range.unit().isEmpty() ? "" : " " + range.unit();
-                setMessage(Component.literal(format(actual()) + unit));
+                boolean atMin = !range.minLabel().isEmpty() && actual() <= range.min();
+                setMessage(Component.literal(atMin ? range.minLabel() : format(actual()) + unit));
             }
 
             @Override

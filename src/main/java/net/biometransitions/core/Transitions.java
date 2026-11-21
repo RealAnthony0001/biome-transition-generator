@@ -1,7 +1,7 @@
 package net.biometransitions.core;
 
 import net.biometransitions.config.BtgConfig;
-import net.biometransitions.config.BtgConfig.MultiBiomeMode;
+import net.biometransitions.config.BtgConfig.IntersectionPolicy;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.biome.Biome;
@@ -12,11 +12,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * How strongly each neighbouring biome's features reach a given position. One universal rule set for
- * every pair; the zone width adapts to how different the two climates are.
+ * How strongly each neighbouring biome's features reach a given position: Biome Mixing rules decide
+ * whether and how far, the mixing distribution decides how the share falls off.
  */
 public final class Transitions {
-    public record Influence(Holder<Biome> foreign, double share, double distance, double width) {}
+    public record Influence(Holder<Biome> foreign, double share, double distance, double width, Mixing.Rule rule) {}
 
     private Transitions() {}
 
@@ -26,33 +26,35 @@ public final class Transitions {
      */
     public static List<Influence> at(ChunkGenerator gen, RandomState rs, long seed, BlockPos pos, Holder<Biome> own, boolean fluid) {
         BtgConfig cfg = BtgConfig.get();
-        var s = cfg.transition;
-        var dist = s.distribution;
+        var dist = cfg.mixing.distribution;
         var zone = BoundaryDetector.zoneMap(gen, rs, seed, pos);
         var ns = zone.neighbours(pos.getX(), pos.getZ());
         if (ns.length == 0) return List.of();
         if (own == null) own = zone.own(pos.getX(), pos.getZ());
         double noise = dist.noiseInfluence > 0 ? BoundaryDetector.noise(rs, seed, pos.getX(), pos.getZ(), dist.noiseScale) : 0;
         double jitter = TransitionMath.hash01(seed, pos.getX(), 0, pos.getZ(), 0x7A11) * 2 - 1;
+        double intensity = fluid ? cfg.advanced.fluid.intensity : dist.intensity;
         List<Influence> out = new ArrayList<>(2);
         double total = 0;
         for (var n : ns) {
-            if (n.biome().equals(own)) continue;
-            double d = n.distance(s.zone.shape);
-            double width = (fluid ? s.fluid.width : s.zone.width) * climateFactor(own, n.biome(), s.zone.climateAdaptation);
-            double intensity = fluid ? s.fluid.intensity : s.zone.intensity;
-            double share = TransitionMath.foreignShare(d, width, s.zone.falloff, dist.curve, dist.customCurve,
+            Mixing.Rule rule = Mixing.between(own, n.biome(), fluid);
+            if (rule == null) continue;
+            double d = n.distance(dist.shape);
+            double share = TransitionMath.foreignShare(d, rule.width(), dist.falloff, rule.curve(), dist.customCurve,
                     dist.smoothness, dist.randomVariation, jitter, dist.noiseInfluence, noise,
                     intensity, dist.ownInfluence, dist.neighbourInfluence);
             if (share > 0) {
-                out.add(new Influence(n.biome(), share, d, width));
+                out.add(new Influence(n.biome(), share, d, rule.width(), rule));
                 total += share;
             }
-            if (cfg.detection.multiBiomeMode == MultiBiomeMode.NEAREST_PAIR) break;
         }
+        if (out.isEmpty()) return out;
+        if (cfg.mixing.intersectionPolicy == IntersectionPolicy.DO_NOT_BLEND && out.size() >= 2) return List.of();
+        // A small biome without features of its own is filled entirely by its neighbours.
+        boolean fill = BiomeReplacer.featuresSuppressed(gen.getBiomeSource(), rs, pos.getX(), pos.getZ(), own);
         // Several neighbours together may not push the own biome below zero.
         final double sum = total;
-        if (sum > 1) out.replaceAll(i -> new Influence(i.foreign, i.share / sum, i.distance, i.width));
+        if (sum > 1 || fill) out.replaceAll(i -> new Influence(i.foreign, i.share / sum, i.distance, i.width, i.rule));
         return out;
     }
 
