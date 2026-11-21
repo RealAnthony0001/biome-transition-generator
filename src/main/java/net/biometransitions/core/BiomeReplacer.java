@@ -12,6 +12,7 @@ import net.minecraft.world.level.levelgen.RandomState;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
@@ -22,10 +23,10 @@ import java.util.function.Predicate;
  * that touches it gets the same answer no matter which one asks first.
  */
 public final class BiomeReplacer {
-    /** small = below the size limit; target = replacement biome (null = keep). */
-    record Verdict(boolean small, Holder<Biome> target) {}
+    /** small = below the size limit; target = replacement biome (null = keep); border = biomes around a small area. */
+    record Verdict(boolean small, Holder<Biome> target, Set<Holder<Biome>> border) {}
 
-    private static final Verdict LARGE = new Verdict(false, null);
+    private static final Verdict LARGE = new Verdict(false, null, Set.of());
     // shortcut: area sizes are measured on the y=64 quart layer only and deeper layers follow it; per-layer areas need 3D floods.
     private static final int REF_QY = 16;
     /** Overlapping Detection never looks at areas bigger than this (cells). */
@@ -53,7 +54,7 @@ public final class BiomeReplacer {
 
     private static boolean active() {
         BtgConfig cfg = BtgConfig.get();
-        return cfg.general.enabled && cfg.detection.smallBiomeDetection;
+        return cfg.general.enabled && cfg.replacing.smallBiomeDetection;
     }
 
     /** The biome a chunk really gets at this quart: the noise biome, or its replacement when its area is too small. */
@@ -69,15 +70,44 @@ public final class BiomeReplacer {
         return v.target != null ? v.target : raw;
     }
 
-    /** True when {@code own} is listed in Small Biomes with Feature Suppression and its area at this column is small. */
+    /**
+     * The biomes around the small area this block column belongs to, when {@code own} (the biome at the block,
+     * e.g. from {@code level.getBiome}) is listed in Small Biomes with Feature Suppression and that area is small;
+     * null otherwise. Block biomes are looked up with Minecraft's fuzzy zoom, so a block can show the biome of
+     * either quart cell around it: every candidate cell is checked, otherwise edge blocks of a small area slip through.
+     */
+    public static Set<Holder<Biome>> suppressedSurroundings(BiomeSource src, RandomState rs, int x, int z, Holder<Biome> own) {
+        String selector = suppressSelector(own);
+        if (selector == null) return null;
+        int qx0 = (x - 2) >> 2, qz0 = (z - 2) >> 2;
+        for (int i = 0; i <= 1; i++)
+            for (int j = 0; j <= 1; j++) {
+                Verdict v = suppressVerdict(src, rs, qx0 + i, qz0 + j, selector);
+                if (v.small) return v.border;
+            }
+        return null;
+    }
+
+    /** {@link #suppressedSurroundings} != null. */
     public static boolean featuresSuppressed(BiomeSource src, RandomState rs, int x, int z, Holder<Biome> own) {
-        if (!active()) return false;
-        var r = BtgConfig.get().replacing;
-        String selector = BiomeClassifier.firstMatch(r.suppressFeatureBiomes, own);
-        if (selector == null) return false;
+        return suppressedSurroundings(src, rs, x, z, own) != null;
+    }
+
+    /** Like {@link #featuresSuppressed}, for an exact quart cell of the biome grid (no fuzzy zoom). */
+    public static boolean cellSuppressed(BiomeSource src, RandomState rs, int qx, int qz, Holder<Biome> biome) {
+        String selector = suppressSelector(biome);
+        return selector != null && suppressVerdict(src, rs, qx, qz, selector).small;
+    }
+
+    private static String suppressSelector(Holder<Biome> biome) {
+        if (!active()) return null;
+        return BiomeClassifier.firstMatch(BtgConfig.get().replacing.suppressFeatureBiomes, biome);
+    }
+
+    private static Verdict suppressVerdict(BiomeSource src, RandomState rs, int qx, int qz, String selector) {
         Data d = data(rs);
-        return region(d, (qx, qz) -> apply(src, rs, raw(d, src, rs, qx, qz), qx, REF_QY, qz), x >> 2, z >> 2, selector,
-                r.suppressMinSize, d.suppress.computeIfAbsent(selector, s -> new ConcurrentHashMap<>()), false).small;
+        return region(d, (x, z) -> apply(src, rs, raw(d, src, rs, x, z), x, REF_QY, z), qx, qz, selector,
+                BtgConfig.get().replacing.suppressMinSize, d.suppress.computeIfAbsent(selector, s -> new ConcurrentHashMap<>()), false);
     }
 
     private interface Sampler { Holder<Biome> at(int qx, int qz); }
@@ -128,8 +158,8 @@ public final class BiomeReplacer {
         }
         Verdict v;
         if (large) v = LARGE;
-        else if (overlap && maxDepth(cells, in) * 4 > BtgConfig.get().general.mixingDistance * BtgConfig.get().detection.overlapMultiplier) v = LARGE;
-        else v = new Verdict(true, replace ? target(sample, cells, in, border, start) : null);
+        else if (overlap && maxDepth(cells, in) * 4 > BtgConfig.get().general.mixingDistance * BtgConfig.get().replacing.overlapMultiplier) v = LARGE;
+        else v = new Verdict(true, replace ? target(sample, cells, in, border, start) : null, Set.copyOf(border.keySet()));
         if (v.small) net.biometransitions.debug.Stats.inc(v.target != null ? "small areas replaced" : replace ? "small areas kept (no target found)" : "small areas without own features");
         for (long c : cells) cache.put(c, v);
         if (cache.size() > 1 << 20) cache.clear();

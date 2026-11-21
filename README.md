@@ -10,16 +10,16 @@ Funguje automaticky pro **všechny biomy**, vanilla i modované. Výchozí pravi
 
 - **Detekce hranic**: hledá hranice biomů přímo ve worldgenu, i u chunků, které ještě nejsou vygenerované. Pro stejný seed dává vždy stejný výsledek. Funguje i v podzemí.
 - **Míchání prvků (features)**: bere stromy, rostliny a dekorace sousedního biomu a generuje je v přechodové oblasti. Zachovává přitom jejich původní pravidla umístění (četnost, výška, vzácnost). Vlastní prvky biomu se ve stejném poměru ředí, takže se mix opravdu přelévá z biomu A do biomu B.
-- **Plynulý přechod**: na samotné hranici je poměr 50/50 a směrem do biomu klesá k nule. Tvar přechodu se nastavuje křivkou (lineární, smoothstep, ease, vlastní, šumová).
+- **Plynulý přechod**: jedna křivka pokrývá celý přechod přes obě strany hranice; na hranici je poměr 50/50 (u jednosměrných dvojic 100 % souseda) a směrem do biomu klesá k nule. Tvar se nastavuje křivkou (lineární, smoothstep, ease, logaritmická, vlastní, šumová). Stromy mohou mít vlastní vzdálenost míchání.
 - **Hustota a rozmanitost**: hustota v přechodu buď plynule přechází, nebo je průměrem obou biomů. Biom s mnoha druhy prvků nepřeválcuje souseda s několika.
 - **Pravidla míchání**: biomy, které se nemísí vůbec (oceán, řeka, pláž), mísí se jen se svou skupinou (poušť, badlands), fungují jako bariéra (řeka), a pravidla pro dvojice skupin se směrem (les se rozlévá do plání, ne naopak) a vlastní vzdáleností.
 - **Šířka podle podobnosti**: podobné biomy (dva lesy) se mísí na širší oblasti, odlišné klima zužuje přechod.
 - **Nahrazování malých biomů**: malé oceány uprostřed říční sítě se změní na řeku. Malým biomům lze také jen potlačit vlastní prvky.
 - **Míchání barev**: tráva, listí a voda se plynule prolínají na větší vzdálenost než ve vanille, bez výrazné ztráty výkonu.
-- **Prolínání povrchu**: povrch sousedního biomu se rozlévá do přechodu v přirozených skvrnách, aby jeho rostliny měly na čem růst. Díky tomu rostou kaktusy v džungli u pouště.
+- **Prolínání povrchu**: povrch sousedního biomu (i sněhová vrstva) se rozlévá do přechodu v přirozených skvrnách, aby jeho rostliny měly na čem růst. Má vlastní vzdálenost a u dvojic biomů vlastní směr, nezávislý na prvcích.
 - **Samostatný systém pro tekutiny**: vodní rostliny mají vlastní šířku a intenzitu. Nové jezera a prameny jsou ve výchozím stavu vypnuté a suchozemské prvky nikdy nevzniknou ve vodě.
 - **Kontrola terénu**: hlídá povrchový blok, výšku, sklon, volný prostor nad prvkem a vodu.
-- **Konfigurační GUI**: posuvník i pole pro přesnou hodnotu, tooltip s vysvětlením a příkladem u každého nastavení, rozbalovací seznam dvojic biomů.
+- **Konfigurační GUI**: posuvník i pole pro přesnou hodnotu, tooltip s vysvětlením, příkladem a výchozí hodnotou u každého nastavení, tlačítko pro návrat na výchozí hodnotu, zvýraznění změněných nastavení, rozbalovací seznam dvojic biomů.
 - **Ladicí nástroje**: příkaz `/btg` s vizualizací hranic, statistikami a výpisem, proč byl který prvek odmítnut, a testovací Extreme Preset.
 
 ## Instalace

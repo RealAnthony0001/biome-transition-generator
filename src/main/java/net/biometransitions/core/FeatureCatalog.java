@@ -28,6 +28,9 @@ public final class FeatureCatalog {
     private static final Map<Key, List<Entry>> BY_BIOME = new ConcurrentHashMap<>();
     private static final Map<PlacedFeature, Entry> BY_FEATURE = new ConcurrentHashMap<>();
 
+    /** {@link #rejectFor} reason when the target biome generates the feature itself. */
+    public static final String TARGET_HAS_IT = "target biome already has it";
+
     private FeatureCatalog() {}
 
     public static void clear() {
@@ -110,7 +113,7 @@ public final class FeatureCatalog {
         if (a.selection.excludedFeatures.contains(e.id)) return "excluded in selection settings";
         if (e.category.equals("fluid") && !a.fluid.allowFluidBodies) return "fluid bodies disabled";
         if (target != null && !BiomeClassifier.matchesAny(e.settings.allowedBiomes, target)) return "target biome not allowed";
-        if (target != null && target.value().getGenerationSettings().hasFeature(e.feature.value())) return "target biome already has it";
+        if (target != null && target.value().getGenerationSettings().hasFeature(e.feature.value())) return TARGET_HAS_IT;
         return null;
     }
 

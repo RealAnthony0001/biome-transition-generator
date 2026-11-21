@@ -2,6 +2,7 @@ package net.biometransitions.debug;
 
 import net.biometransitions.core.BiomeClassifier;
 import net.biometransitions.core.BoundaryDetector;
+import net.biometransitions.core.Mixing.Channel;
 import net.biometransitions.core.TransitionMath;
 import net.biometransitions.core.Transitions;
 import net.minecraft.core.BlockPos;
@@ -36,7 +37,7 @@ public final class BoundaryVisualizer {
         String text;
         if (ns.length == 0) text = "§7" + BiomeClassifier.id(own) + " — no boundary nearby";
         else {
-            double share = Transitions.shareOf(Transitions.at(gen, rs, seed, pos, own, false), ns[0].biome());
+            double share = Transitions.shareOf(Transitions.at(gen, rs, seed, pos, own, Channel.FEATURES), ns[0].biome());
             text = String.format("§a%s §f→ §e%s §f%.1f blocks §7| neighbour features §e%.0f%%",
                     BiomeClassifier.id(own), BiomeClassifier.id(ns[0].biome()), ns[0].distance(TransitionMath.Shape.ROUND), share * 100);
         }
@@ -77,12 +78,12 @@ public final class BoundaryVisualizer {
                     level.sendParticles(player, BORDER, true, x0, pos.getY() + 1.5, z0, 10, 0.15, 0.9, 0.15, 0);
                     continue;
                 }
-                double veg = Transitions.at(gen, rs, seed, pos, null, false).stream().mapToDouble(Transitions.Influence::share).sum();
+                double veg = Transitions.at(gen, rs, seed, pos, null, Channel.FEATURES).stream().mapToDouble(Transitions.Influence::share).sum();
                 DustParticleOptions dust;
                 if (veg > 0) {
                     float t = (float) Math.min(1, veg * 2); // 0 at zone edge, 1 at the boundary (50%)
                     dust = new DustParticleOptions(new Vector3f(0.2f + 0.8f * t, 1, 0.1f), 1.5f + 1.5f * t);
-                } else if (!Transitions.at(gen, rs, seed, pos, null, true).isEmpty()) dust = FLUID;
+                } else if (!Transitions.at(gen, rs, seed, pos, null, Channel.FLUID).isEmpty()) dust = FLUID;
                 else continue;
                 level.sendParticles(player, dust, true, x0, pos.getY() + 0.6, z0, 2, 0.1, 0.3, 0.1, 0);
             }

@@ -26,8 +26,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * (the resolution biomes actually have); results are cached per chunk section.
  */
 public final class BoundaryDetector {
-    /** A foreign biome and the offset from the column to the nearest cell of it. */
-    public record Neighbour(Holder<Biome> biome, float dx, float dz) {
+    /**
+     * A foreign biome and the offset from the column to the nearest cell of it. {@code featureless} = that cell
+     * lies in a small area under Feature Suppression: it still counts for surface blending, but spreads no features.
+     * A biome can appear twice, once per kind of cell; the nearer entry comes first.
+     */
+    public record Neighbour(Holder<Biome> biome, float dx, float dz, boolean featureless) {
         /** Distance to the boundary (the near edge of that cell), in blocks. */
         public double distance(Shape shape) {
             return Math.max(0, TransitionMath.distance(shape, dx, dz) - 2);
@@ -125,15 +129,26 @@ public final class BoundaryDetector {
         boolean[] barrier = new boolean[biomes.size()];
         boolean anyBarrier = false;
         for (int i = 0; i < barrier.length; i++) anyBarrier |= barrier[i] = BiomeClassifier.listed(cfg.mixing.barriers, biomes.get(i));
+        // Cells of small areas whose own features are suppressed (Biome Replacing): they must not spread features.
+        boolean[] featureless = new boolean[size * size];
+        boolean[] suppressible = new boolean[biomes.size()];
+        boolean anySuppressible = false;
+        for (int i = 0; i < suppressible.length; i++)
+            anySuppressible |= suppressible[i] = BiomeClassifier.listed(cfg.replacing.suppressFeatureBiomes, biomes.get(i));
+        if (anySuppressible)
+            for (int i = 0; i < size; i++)
+                for (int j = 0; j < size; j++) {
+                    int b = grid[i * size + j];
+                    featureless[i * size + j] = b >= 0 && suppressible[b]
+                            && BiomeReplacer.cellSuppressed(gen.getBiomeSource(), rs, qx0 + i, qz0 + j, biomes.get(b));
+                }
         double rangeSq = (range + 4.0) * (range + 4.0);
         for (int cx = 0; cx < 4; cx++)
             for (int cz = 0; cz < 4; cz++) {
                 int mine = grid[(rc + cx) * size + rc + cz];
                 // biomes that can never mix in here would only crowd out the ones that can
                 boolean[] canMix = new boolean[biomes.size()];
-                for (int b = 0; b < canMix.length; b++)
-                    canMix[b] = b != mine && (Mixing.between(biomes.get(mine), biomes.get(b), false) != null
-                            || Mixing.between(biomes.get(mine), biomes.get(b), true) != null);
+                for (int b = 0; b < canMix.length; b++) canMix[b] = b != mine && Mixing.any(biomes.get(mine), biomes.get(b));
                 List<Neighbour> found = new ArrayList<>();
                 for (int i = 0; i < size; i++)
                     for (int j = 0; j < size; j++) {
@@ -142,17 +157,17 @@ public final class BoundaryDetector {
                         float dx = (i - rc - cx) * 4, dz = (j - rc - cz) * 4;
                         if (dx * dx + dz * dz > rangeSq) continue;
                         if (anyBarrier && blocked(grid, barrier, size, rc + cx, rc + cz, i, j, mine, b)) continue;
-                        keepNearest(found, new Neighbour(biomes.get(b), dx, dz));
+                        keepNearest(found, new Neighbour(biomes.get(b), dx, dz, featureless[i * size + j]));
                     }
                 for (int ox = 0; ox < 4; ox++)
                     for (int oz = 0; oz < 4; oz++) {
                         float sx = 1.5f - ox, sz = 1.5f - oz; // column centre -> cell centre
                         List<Neighbour> col = new ArrayList<>(found.size());
-                        for (Neighbour n : found) col.add(new Neighbour(n.biome, n.dx + sx, n.dz + sz));
+                        for (Neighbour n : found) col.add(new Neighbour(n.biome, n.dx + sx, n.dz + sz, n.featureless));
                         col.sort((p, q) -> Float.compare(p.dx * p.dx + p.dz * p.dz, q.dx * q.dx + q.dz * q.dz));
                         int n = (cx * 4 + ox) * 16 + cz * 4 + oz;
                         own[n] = biomes.get(mine);
-                        neighbours[n] = col.isEmpty() ? NONE : col.subList(0, Math.min(col.size(), cfg.advanced.maxNeighbours)).toArray(Neighbour[]::new);
+                        neighbours[n] = col.isEmpty() ? NONE : limit(col, cfg.advanced.maxNeighbours);
                     }
             }
         return new ZoneMap(own, neighbours);
@@ -169,12 +184,26 @@ public final class BoundaryDetector {
         return false;
     }
 
-    /** One entry per foreign biome: the closest cell of it. */
+    /** The nearest entries of at most {@code max} different biomes (sorted input). */
+    private static Neighbour[] limit(List<Neighbour> sorted, int max) {
+        List<Holder<Biome>> seen = new ArrayList<>(max);
+        List<Neighbour> out = new ArrayList<>(sorted.size());
+        for (Neighbour n : sorted) {
+            if (!seen.contains(n.biome)) {
+                if (seen.size() >= max) continue;
+                seen.add(n.biome);
+            }
+            out.add(n);
+        }
+        return out.toArray(Neighbour[]::new);
+    }
+
+    /** One entry per foreign biome and kind of cell (featureless or not): the closest cell of it. */
     private static void keepNearest(List<Neighbour> found, Neighbour n) {
         float dn = n.dx * n.dx + n.dz * n.dz;
         for (int k = 0; k < found.size(); k++) {
             Neighbour o = found.get(k);
-            if (o.biome.equals(n.biome)) {
+            if (o.biome.equals(n.biome) && o.featureless == n.featureless) {
                 if (dn < o.dx * o.dx + o.dz * o.dz) found.set(k, n);
                 return;
             }

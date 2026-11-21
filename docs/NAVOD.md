@@ -17,14 +17,14 @@ Obsah:
 
 Když se dva biomy dotýkají, vznikne u hranice přechodová oblast. V každém jejím místě mod spočítá **podíl souseda**, tedy kolik procent prvků má pocházet ze sousedního biomu:
 
-- na samotné hranici **50 %** (vyrovnaný mix),
-- směrem do biomu podíl klesá podle zvolené křivky (**Mixing Distribution**),
-- ve vzdálenosti **Biome Feature Mixing Distance** je **0 %** a biom vypadá normálně.
+- na samotné hranici **50 %** (vyrovnaný mix), když se oba biomy mísí do sebe navzájem; u jednosměrné dvojice (`A_INTO_B`) je na hranici **100 %** prvků A a směrem do B klesá,
+- směrem do biomu podíl klesá podle zvolené křivky (**Mixing Distribution**). Jedna křivka pokrývá celý přechod od okraje oblasti v jednom biomu přes hranici až k okraji v druhém, takže obě strany na sebe vždy plynule navazují,
+- ve vzdálenosti **Mixing Distance** je **0 %** a biom vypadá normálně. Stromy mohou mít vlastní **Tree Mixing Distance**, povrchové bloky **Block Blending Distance from Boundary**.
 
 Podle tohoto podílu se:
 1. **přidávají prvky souseda.** Jeho stromy, tráva a květiny se generují podle jejich vlastních pravidel, jen s pravděpodobností podle podílu.
 2. **ředí vlastní prvky biomu.** Jeho stromy a rostliny se ve stejném poměru vynechávají, ale jen když soused přináší něco stejné kategorie. Nikdy tak nevzniknou holá místa.
-3. **mísí povrch.** Povrch souseda (písek, tráva...) se rozlévá v přirozených skvrnách, aby rostliny souseda měly na čem růst.
+3. **mísí povrch.** Povrch souseda (písek, tráva...) se rozlévá v přirozených skvrnách, aby rostliny souseda měly na čem růst. Studený soused přináší ve stejných skvrnách i **sněhovou vrstvu**.
 
 **Celkové množství** prvků v přechodu určuje **Feature Density**: buď plynulý přechod hustoty z jednoho biomu do druhého (`GRADUAL`), nebo průměr obou biomů v celé oblasti (`AVERAGE`). Rozložení (čí prvky kde převažují) a hustota (kolik jich je) jsou dvě samostatná nastavení.
 
@@ -72,8 +72,9 @@ Vyžadují oprávnění operátora (úroveň 2).
 
 Otevření: **hlavní menu → Mods → Biome Transition Generator → Config**.
 
-- **Vlevo** je 10 sekcí, **vpravo** nastavení s posuvníkem.
-- **Najeďte myší** na název nebo ovládací prvek: tooltip vysvětlí, co nastavení dělá, uvede příklad a u posuvníků význam levého a pravého konce. U voleb ukáže popis aktuální možnosti.
+- **Vlevo** je 9 sekcí, **vpravo** nastavení s posuvníkem.
+- **Najeďte myší** na název nebo ovládací prvek: tooltip vysvětlí, co nastavení dělá, uvede příklad, **výchozí hodnotu** a u posuvníků význam levého a pravého konce. U voleb ukáže popis aktuální možnosti.
+- **Tlačítko ↺** vedle každého nastavení vrátí jen toto nastavení na výchozí hodnotu. Nastavení odlišná od výchozích mají **žlutý název s hvězdičkou**; ↺ je aktivní jen u nich. U dvojic biomů je výchozí hodnotou výchozí dvojice se stejnými skupinami A a B (jinak hodnoty nové dvojice); **Reset all pairs** obnoví celý seznam.
 - **Čísla**: posuvník a pole pro přesnou hodnotu. Některé posuvníky mají speciální levý konec, např. `-1` = **Overlapping Detection** nebo **Global**.
 - **Volby**: klikáním se přepíná mezi možnostmi. U dvojic biomů je navíc možnost **Global** = převzít globální nastavení.
 - **Seznamy**: hodnoty oddělené čárkou, např. `ocean, river, #minecraft:is_beach`.
@@ -82,17 +83,16 @@ Otevření: **hlavní menu → Mods → Biome Transition Generator → Config**.
 | Sekce v GUI | Část configu |
 |---|---|
 | General | `general` |
-| Boundary Detection | `detection` |
-| Biome Mixing | `mixing` + oddělená část **Surface Compatibility & Surface Block Blending** (`featureDefaults`, `mixing.surface`) |
-| Biome Boundary Mixing | `pairs` (rozbalovací seznam dvojic, tlačítka **+ Add pair** a **✕**) |
-| Biome Replacing | `replacing` |
+| Biome Mixing | `general.mixingDistance` + `mixing` + oddělená část **Surface Compatibility & Surface Block Blending** (`featureDefaults`, `mixing.surface`) |
+| Biome Boundary Mixing | `pairs` (rozbalovací seznam dvojic, tlačítka **+ Add pair**, **✕** a **Reset all pairs**) |
+| Biome Replacing | `replacing` (včetně detekce malých biomů, dříve sekce Boundary Detection) |
 | Biome Color Blending | `general.colorBlendDistance` + `colors` |
 | Biome Classification | `classification` (náhled pravidel) |
 | Performance | `performance` |
 | Advanced | `advanced` + `features` |
 | Debug | `debug` |
 
-**Max Biome Color Blending** je v General i v Biome Color Blending. Je to jedno nastavení, obě místa mění stejnou hodnotu.
+**Max Biome Color Blending** je v General i v Biome Color Blending a **Mixing Distance** je v General i v Biome Mixing. Vždy jde o jedno nastavení, obě místa mění stejnou hodnotu.
 
 Na dedikovaném serveru upravte soubor ručně a použijte `/btg reload`.
 
@@ -122,26 +122,19 @@ Pro **Feature Density** a **Variety Balancing** patří do „Trees and Foliage�
 
 ## 6. Konfigurační soubor: všechna nastavení
 
-Soubor: `config/biometransitions.json`. Vytvoří se při prvním spuštění. Když je poškozený, mod použije výchozí hodnoty a soubor nepřepíše. Když se ve nové verzi modu změní struktura, starý soubor se uloží jako `biometransitions.json.bak` a nahradí novým.
+Soubor: `config/biometransitions.json`. Vytvoří se při prvním spuštění. Když je poškozený, mod použije výchozí hodnoty a soubor nepřepíše. Soubory z verze 0.3 (`configVersion` 4) se převedou automaticky a všechny hodnoty zůstanou (`detection` se přesune do `replacing`, `pairs[].surfaceMixing` se změní na `blockDirection`). Ještě starší soubory se uloží jako `biometransitions.json.bak` a nahradí novými.
 
 ### `general`: obecné
 
 | Klíč | Výchozí | Rozsah | Popis |
 |---|---|---|---|
 | `enabled` | `true` | | Hlavní vypínač modu. |
-| `mixingDistance` | 64 | 0–128 bloků | **Biome Feature Mixing Distance**: jak daleko od hranice sahají prvky souseda. Dvojice mohou mít vlastní. |
-| `surfaceMixing` | `true` | | Míchání povrchových bloků. |
+| `mixingDistance` | 64 | 0–128 bloků | **Mixing Distance**: jak daleko od hranice sahají prvky souseda. V GUI je v General i v Biome Mixing. Dvojice mohou mít vlastní. |
+| `surfaceMixing` | `true` | | Míchání povrchových bloků a sněhu. |
 | `biomeReplacing` | `true` | | Nahrazování malých biomů (sekce `replacing`). |
 | `colorBlendDistance` | 32 | 0–64 bloků | **Max Biome Color Blending**. 0 = vanilla míchání barev. |
 | `dimensions` | `[]` | | Dimenze, ve kterých mod míchá prvky, např. `["minecraft:overworld"]`. Prázdné = všechny. |
 | `mixSurfaceAndUnderground` | `false` | | Míchat povrchové a podzemní skupiny biomů (les a svěží jeskyně pod ním). |
-
-### `detection`: detekce hranic a malých biomů
-
-| Klíč | Výchozí | Rozsah | Popis |
-|---|---|---|---|
-| `overlapMultiplier` | 0.4 | 0.1–2 | Pro **Overlapping Detection**: biom je malý, když ho celý pokryjí přechodové oblasti sousedů (vzdálenost míchání × tato hodnota). Nižší = za malé se považují jen velmi úzké biomy. Nemění vzdálenost generování prvků. |
-| `smallBiomeDetection` | `true` | | Měřit velikost oblastí biomů v quartech (quart = 4 × 4 bloky, jednotka, ve které Minecraft vzorkuje biomy). Potřebuje ho Biome Replacing. |
 
 ### `mixing`: globální pravidla míchání
 
@@ -151,11 +144,12 @@ Soubor: `config/biometransitions.json`. Vytvoří se při prvním spuštění. K
 | `density.other` | `GRADUAL` | | Totéž pro kameny, skvrny povrchu a ostatní prvky. |
 | `distribution` | | | Rozložení prvků v přechodu, viz tabulka níže. |
 | `varietyBalancing` | `FOLIAGE_ONLY` | | **Feature Variety Balancing**: když má soused víc druhů prvků než biom, každý jeho druh se úměrně zředí, aby nepřevážil. `DISABLED`, `ENABLED`, `FOLIAGE_ONLY` (jen stromy a rostliny). |
-| `similarDistanceMultiplier` | 1.5 | 0.25–4 | Násobič vzdálenosti míchání pro biomy stejné skupiny (dva lesy, dvě tajgy). Neplatí pro dvojice s vlastní vzdáleností. |
+| `similarDistanceMultiplier` | 1.5 | 0.25–4 | Násobič vzdálenosti míchání pro biomy stejné skupiny (dva lesy, dvě tajgy). Platí pro globální Mixing, Tree i Block Blending Distance, ne pro vlastní vzdálenosti dvojic. |
+| `treeMixingDistance` | -1 | -1–128 bloků | **Tree Mixing Distance**: jak daleko sahají stromy souseda, nezávisle na ostatních prvcích. -1 = stejně jako Mixing Distance. Např. 48 a 96 = tráva a květiny se mísí na 48 blocích, jednotlivé stromy souseda až 96 bloků daleko. |
 | `intersectionPolicy` | `RESPECT_RULES` | | Kde se potkají 3 a více biomů: `RESPECT_RULES` = každý soused podle svých pravidel, `DO_NOT_BLEND` = tam se nemísí nic. |
-| `noBlend` | `ocean, river, beach` | | Biomy, které se nemísí s ničím. |
+| `noBlend` | `ocean, river, beach` | | Biomy, které se nemísí s ničím: přes jejich hranici nepřejdou prvky, povrchové bloky ani sníh, v žádném směru. Má přednost před dvojicemi. Kontroluje se i skutečný biom každého bloku, takže cizí povrch se nedostane ani na okraj řeky nebo pláže. |
 | `blendOnlyWithSelf` | `desert+badlands` | | Biomy, které se mísí jen v rámci své skupiny. Spojení `+` dělá ze skupin jednu: poušť a badlands se mísí spolu, s ničím jiným. |
-| `noSurfaceBlend` | `[]` | | Biomy, jejichž povrch se nemísí (ani nepřijímá cizí). Jejich prvky se mísí normálně. |
+| `noSurfaceBlend` | `[]` | | Biomy, jejichž povrch se nemísí (ani nepřijímá cizí povrch a sníh). Jejich prvky se mísí normálně. |
 | `barriers` | `river` | | Biomy fungující jako bariéra: prvky se nemísí mezi biomy na opačných stranách (stromy z lesa nepřeskočí řeku do plání). |
 | `surface` | | | Prolínání povrchu, viz níže. |
 
@@ -163,15 +157,15 @@ Soubor: `config/biometransitions.json`. Vytvoří se při prvním spuštění. K
 
 | Klíč | Výchozí | Rozsah | Popis |
 |---|---|---|---|
-| `curve` | `EASE_OUT` | | Průběh podílu souseda: `LINEAR`, `SMOOTHSTEP`, `EASE_IN`, `EASE_OUT`, `EASE_IN_OUT`, `CUSTOM`, `NOISE`. |
-| `customCurve` | `[0, 0.1, 0.35, 0.75, 1]` | | Body křivky `CUSTOM`, od okraje oblasti k hranici. |
-| `intensity` | 1 | 0–2 | Síla přechodu. Nad 1 soused u hranice převládne. |
-| `falloff` | 1 | 0.1–4 | Exponent poklesu. Pod 1 = soused sahá daleko v plné síle, nad 1 = mizí dřív. |
+| `curve` | `EASE_OUT` | | Průběh podílu souseda. Jedna křivka pokrývá celý přechod (obě strany hranice), takže obě strany na sebe navazují. `LINEAR` = rovnoměrný pokles. `SMOOTHSTEP` = jedna „S“ křivka přes celý přechod, nejrychlejší změna na hranici. `EASE_IN` = u hranice rychlý pokles, pak pomalé dobíhání. `EASE_OUT` = soused dlouho silný, u okraje rychle mizí. `EASE_IN_OUT` = strmější „S“. `LOGARITHMIC` = velmi rychlý pokles hned u hranice a dlouhý řídký „ocas“ až k okraji (v polovině vzdálenosti cca 10 % souseda, `LINEAR` 25 %). `CUSTOM` = vlastní body. `NOISE` = lineární s dvojnásobným šumem. Křivka nemění šířku přechodu. |
+| `customCurve` | `[0, 0.1, 0.35, 0.75, 1]` | | Body křivky `CUSTOM`, od okraje oblasti k hranici. Poslední bod znamená vyrovnaný mix na hranici; druhá strana hranice křivku zrcadlí. |
+| `intensity` | 1 | 0–2 | Síla přechodu. 1 = 50/50 na hranici, pod 1 si oba biomy nechají víc vlastních prvků, nad 1 soused u hranice převládne. |
+| `falloff` | 1 | 0.1–4 | Exponent poklesu uvnitř biomu. Pod 1 = soused sahá daleko ve vysoké síle, nad 1 = mizí dřív. |
 | `shape` | `ROUND` | | Měření vzdálenosti: `ROUND`, `SQUARE`, `DIAMOND`. |
 | `ownInfluence` / `neighbourInfluence` | 1 / 1 | 0–4 | Váhy vlastních a cizích prvků. Při 1 a 3 je na hranici 75 % souseda. |
 | `smoothness` | 0.2 | 0–1 | Dodatečné vyhlazení křivky. |
-| `randomVariation` | 0.1 | 0–1 | Náhodné kolísání po sloupcích. |
-| `noiseInfluence` | 0.3 | 0–1 | Šum, díky kterému je okraj přechodu nepravidelný. |
+| `randomVariation` | 0.1 | 0–1 | Náhodné kolísání mixu po sloupcích. Okraje oblasti neposouvá. |
+| `noiseInfluence` | 0.3 | 0–1 | Šum, který ohýbá přechod: linie vyrovnaného mixu se vlní místo přesného sledování hranice. Okraje oblasti zůstávají v nastavené vzdálenosti. |
 | `noiseScale` | 32 | 4–256 bloků | Velikost „vln“ šumu. |
 | `suppressNative` | `true` | | Ředit vlastní prvky biomu podle podílu souseda. Vypnuto = prvky souseda se jen přidávají. |
 
@@ -180,8 +174,10 @@ Soubor: `config/biometransitions.json`. Vytvoří se při prvním spuštění. K
 | Klíč | Výchozí | Rozsah | Popis |
 |---|---|---|---|
 | `intensity` | 1 | 0–2 | Jak velkou část přechodu povrch souseda pokryje. |
+| `blockBlendingDistance` | -1 | -1–128 bloků | **Block Blending Distance from Boundary**: jak daleko od hranice se smí objevit povrchové bloky (a sníh) souseda, nezávisle na prvcích. -1 = stejně jako Mixing Distance. Dvojice mohou mít vlastní. |
 | `patchScale` | 10 | 2–64 bloků | Velikost skvrn. |
 | `depth` | 3 | 1–6 bloků | Do jaké hloubky se povrch mění. |
+| `snowLayers` | `true` | | Studení sousedé přinášejí sněhovou vrstvu ve stejných skvrnách jako svůj povrch. Sníh se položí jen tam, kde by sněžilo i v sousedním biomu (teplota v dané výšce, bez světla, volné místo, blok, na kterém sníh drží; nikdy na vodu ani led). |
 | `blocks` | viz níže | | Biom/skupina → `[vrchní blok, blok pod ním]`. Platí první shoda. |
 | `replaceable` | hlína, písek, pískovec, terakota, štěrk | | Jen tyto bloky se smí přepsat. |
 
@@ -223,12 +219,14 @@ Seznam dvojic skupin biomů. Pro dvojici biomů platí **první** dvojice, kter�
 | Klíč | Výchozí | Popis |
 |---|---|---|
 | `a`, `b` | | Skupina A a B (ID, tag nebo skupina). |
-| `mode` | `BOTH` | `DO_NOT_BLEND`, `A_INTO_B` (prvky A se rozlévají do B), `B_INTO_A`, `BOTH`. |
-| `distance` | -1 | Vlastní vzdálenost míchání v blocích. -1 = **Global** (`general.mixingDistance`). |
+| `mode` | `BOTH` | **Feature Direction**: `DO_NOT_BLEND`, `A_INTO_B` (prvky A se rozlévají do B), `B_INTO_A`, `BOTH`. |
+| `distance` | -1 | Vlastní vzdálenost míchání prvků v blocích. -1 = **Global** (`general.mixingDistance`). |
+| `treeDistance` | -1 | Vlastní vzdálenost míchání stromů. -1 = **Global** (`mixing.treeMixingDistance`, a když je i ta -1, `distance` této dvojice). |
 | `treesAndFoliageDensity`, `otherDensity` | `null` | Přepsání Feature Density. `null` = Global. |
 | `curve` | `null` | Přepsání křivky rozložení. `null` = Global. |
 | `varietyBalancing` | `null` | Přepsání Variety Balancing. `null` = Global. |
-| `surfaceMixing` | `true` | Míchat povrch pro tuto dvojici. |
+| `blockDirection` | `BLEND_BOTH` | **Block Blending Direction**, nezávislý na směru prvků: `BLEND_BOTH` (Blend Both), `A_INTO_B` (povrch A se objeví v B), `B_INTO_A`, `NO_BLENDING`. |
+| `blockDistance` | -1 | **Block Blending Distance from Boundary** pro tuto dvojici. -1 = **Global** (`mixing.surface.blockBlendingDistance`). |
 
 Globální seznamy (`noBlend`, `blendOnlyWithSelf`, bariéry), `intersectionPolicy` a `similarDistanceMultiplier` platí vždy a dvojice je nepřepisují.
 
@@ -236,11 +234,13 @@ Globální seznamy (`noBlend`, `blendOnlyWithSelf`, bariéry), `intersectionPoli
 
 | Klíč | Výchozí | Rozsah | Popis |
 |---|---|---|---|
+| `smallBiomeDetection` | `true` | | Měřit velikost oblastí biomů v quartech (quart = 4 × 4 bloky, jednotka, ve které Minecraft vzorkuje biomy). Bez něj se nic nenahrazuje ani nepotlačuje. (Dříve v sekci `detection`.) |
+| `overlapMultiplier` | 0.4 | 0.1–2 | Pro **Overlapping Detection**: biom je malý, když ho celý pokryjí přechodové oblasti sousedů (vzdálenost míchání × tato hodnota). Nižší = za malé se považují jen velmi úzké biomy. Nemění vzdálenost generování prvků. (Dříve v sekci `detection`.) |
 | `replaceBiomes` | `ocean` | | **Small Biomes with Biome ID Replacement**: biomy, jejichž malé oblasti se nahradí jiným biomem. |
 | `replaceMinSize` | 306 | -1–4096 quartů | Oblasti menší než tato velikost se nahradí. 306 quartů ≈ 70 × 70 bloků. -1 = **Overlapping Detection**. |
 | `changeInto` | `CUSTOM` | | `NEAREST_SAME_GROUP` = nejbližší biom stejné skupiny, `NEAREST_SIMILAR_GROUP` = sousední biom s nejpodobnějším klimatem, `CUSTOM` = podle mapování. |
 | `customMapping` | `ocean-river` | | Dvojice `zdroj-cíl` oddělené čárkou, např. `ocean-river,forest-plains`. Hledá se nejbližší biom cíle, i ve vzdálenějším okolí (až 128 bloků). Když se nenajde, biom zůstane. |
-| `suppressFeatureBiomes` | `[]` | | **Small Biomes with Feature Suppression**: biom si nechá ID, ale v malé oblasti negeneruje vlastní prvky. Místo nich rostou prvky okolních biomů podle pravidel míchání. |
+| `suppressFeatureBiomes` | `[]` | | **Small Biomes with Feature Suppression**: biom si nechá ID, ale v malé oblasti negeneruje vlastní prvky (ani ty, které by jinak nepřecházely). Místo nich rostou prvky okolních biomů podle pravidel míchání a malá oblast žádné své prvky do sousedů nešíří. Zůstávají jen prvky, které mají i okolní biomy (rudy, běžná tráva), a vyloučené typy prvků, aby nevznikla holá místa. Platí pro každý blok, i na hranicích chunků a na rozostřených okrajích biomu. |
 | `suppressMinSize` | -1 | -1–4096 quartů | Velikostní limit pro potlačení prvků. -1 = Overlapping Detection. |
 | `neverReplace` | `[]` | | Biomy, které se nikdy nenahradí. Má nejvyšší prioritu. |
 
@@ -254,7 +254,7 @@ Oblast je souvislá plocha quartů, které odpovídají stejné položce seznamu
 | `reducedBiomes` | `[]` | | Biomy s kratší vzdáleností míchání barev (např. bažiny, aby jejich tmavá voda zůstala ostrá). |
 | `reducedDistance` | 4 | 0–64 bloků | Vzdálenost pro `reducedBiomes`. |
 
-Míchání barev běží na klientovi a čte nejvýš 13 × 13 vzorků na blok, takže je i při 64 blocích levnější než nejvyšší vanilla nastavení.
+Míchání barev běží na klientovi. Barvy se průměrují v uzlech mřížky biomů (4 × 4 bloky) a každý blok je plynule interpoluje, takže vzniká hladký přechod bez „zrnění“. Uzly se počítají jednou a sdílí je 16 sloupců. Když ještě nejsou načtené okolní chunky, chybějící vzorky se vynechají a dotčené sekce se po jejich načtení překreslí. Platí pro trávu, listí, vodu a další barvy bloků podle biomu. Mody, které nahrazují vykreslování bloků vlastním (např. Sodium/Embeddium), mohou mít vlastní míchání barev a tímto nastavením se neřídí.
 
 ### `classification`: skupiny biomů
 
@@ -268,7 +268,7 @@ Míchání barev běží na klientovi a čte nejvýš 13 × 13 vzorků na blok, 
 | Klíč | Popis |
 |---|---|
 | `enabledSteps` | Fáze generování, ze kterých se prvky přenášejí. |
-| `excludedFeatureTypes` | Typy prvků, které nikdy nepřecházejí ani se neředí (rudy, fosilie, geody, dungeony...). |
+| `excludedFeatureTypes` | Typy prvků, které nikdy nepřecházejí, neředí se a nepotlačují (rudy, fosilie, geody, dungeony, sníh...). |
 | `typeCategories` | Typ prvku → kategorie. |
 | `keywordCategories` | Slovo v ID prvku → kategorie (první shoda). |
 
@@ -346,6 +346,12 @@ Míchání barev běží na klientovi a čte nejvýš 13 × 13 vzorků na blok, 
 **Bez prolínání povrchu**
 - `general.surfaceMixing`: `false`.
 
+**Stromy dál, povrch blíž**
+- `mixing.treeMixingDistance`: 96, `mixing.surface.blockBlendingDistance`: 16.
+
+**Písek z pouště do džungle, ale ne tráva do pouště**
+- dvojice `{ "a": "desert", "b": "jungle", "mode": "BOTH", "blockDirection": "A_INTO_B" }` (a odstraňte poušť z `blendOnlyWithSelf`).
+
 **Povrch pro modovaný biom**
 - `"classification": { "overrides": { "mujmod:red_dunes": ["desert"] } }`, nebo
 - `"blocks": { "mujmod:red_dunes": ["minecraft:red_sand", "minecraft:red_sandstone"] }`.
@@ -367,7 +373,7 @@ Míchání barev běží na klientovi a čte nejvýš 13 × 13 vzorků na blok, 
 Mod mění jen nové chunky. Jděte do neprozkoumaného terénu nebo vytvořte nový svět. Zkontrolujte `general.enabled`.
 
 **Mezi dvěma biomy nevzniká přechod.**
-`/btg info` u hranice: když u souseda stojí „does not mix into this biome“, brání tomu pravidlo. Projděte `noBlend`, `blendOnlyWithSelf`, `barriers`, `mixSurfaceAndUnderground` a dvojice v `pairs` (směr `A_INTO_B` / `B_INTO_A`).
+`/btg info` u hranice: u každého souseda je zvlášť vidět míchání prvků, stromů a povrchu. Když stojí „do not mix in“ / „does not blend in“, brání tomu pravidlo. Projděte `noBlend`, `blendOnlyWithSelf`, `barriers`, `mixSurfaceAndUnderground` a dvojice v `pairs` (směr `A_INTO_B` / `B_INTO_A`).
 
 **Prvek souseda se v přechodu neobjevuje.**
 1. `/btg features <sousední biom>`: je u prvku ✔? Když je ✘, uvidíte důvod.
@@ -386,4 +392,4 @@ Zkontrolujte typ světa (**Superflat** a **Single Biome** mají jeden biom). Mod
 Snižte `general.mixingDistance` a `mixing.similarDistanceMultiplier`, vypněte `advanced.undergroundTransitions` nebo zvyšte `performance.undergroundSectionStride`.
 
 **Po aktualizaci modu se mi resetovalo nastavení.**
-Nová verze změnila strukturu configu. Vaše staré nastavení je v `config/biometransitions.json.bak`.
+Konfigurace z verze 0.3 se převádí automaticky. Starší verze měly jinou strukturu configu; vaše staré nastavení je v `config/biometransitions.json.bak`.

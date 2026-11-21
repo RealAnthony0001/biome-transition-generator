@@ -14,15 +14,32 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Decides whether features of a neighbouring biome may spread into a biome, and with which settings:
+ * Decides whether something of a neighbouring biome may spread into a biome, and with which settings:
  * global lists first, then the first matching Biome Boundary Mixing pair, then the global defaults.
  */
 public final class Mixing {
-    /** Effective settings for features of one neighbour flowing into one biome. */
-    public record Rule(double width, DensityMode treesAndFoliage, DensityMode other, Curve curve,
-                       VarietyBalancing variety, boolean surface) {}
+    /** What crosses the boundary. Each channel has its own distance; surface blocks also their own direction. */
+    public enum Channel {
+        /** Land features except trees. */
+        FEATURES,
+        /** Trees ({@code trees} category): Tree Mixing Distance. */
+        TREES,
+        /** Water features: the separate, narrower fluid zone. */
+        FLUID,
+        /** Surface blocks and snow layers: Block Blending Distance and Block Blending Direction. */
+        SURFACE;
 
-    private record Key(Holder<Biome> own, Holder<Biome> foreign, boolean fluid) {}
+        public static Channel of(FeatureCatalog.Entry e) {
+            return e.fluidChannel() ? FLUID : e.category().equals("trees") ? TREES : FEATURES;
+        }
+
+        public boolean features() { return this != SURFACE; }
+    }
+
+    /** Effective settings for one neighbour spreading into one biome. */
+    public record Rule(double width, DensityMode treesAndFoliage, DensityMode other, Curve curve, VarietyBalancing variety) {}
+
+    private record Key(Holder<Biome> own, Holder<Biome> foreign, Channel channel) {}
 
     private static final Map<Key, Optional<Rule>> CACHE = new ConcurrentHashMap<>();
 
@@ -30,27 +47,42 @@ public final class Mixing {
 
     public static void clear() { CACHE.clear(); }
 
-    /** Rule for features of {@code foreign} spreading into {@code own}, or null when they must not. */
-    public static Rule between(Holder<Biome> own, Holder<Biome> foreign, boolean fluid) {
-        return CACHE.computeIfAbsent(new Key(own, foreign, fluid), k -> Optional.ofNullable(compute(k))).orElse(null);
+    /** Rule for {@code foreign} spreading into {@code own} on this channel, or null when it must not. */
+    public static Rule between(Holder<Biome> own, Holder<Biome> foreign, Channel channel) {
+        return CACHE.computeIfAbsent(new Key(own, foreign, channel), k -> Optional.ofNullable(compute(k))).orElse(null);
+    }
+
+    /** True when the neighbour may spread anything at all (any channel) into {@code own}. */
+    public static boolean any(Holder<Biome> own, Holder<Biome> foreign) {
+        for (Channel c : Channel.values()) if (between(own, foreign, c) != null) return true;
+        return false;
     }
 
     private static Rule compute(Key k) {
         BtgConfig cfg = BtgConfig.get();
         var m = cfg.mixing;
         Holder<Biome> own = k.own, foreign = k.foreign;
+        boolean surface = k.channel == Channel.SURFACE;
         if (own.equals(foreign)) return null;
         boolean ownUnder = BiomeClassifier.categories(own).contains("underground");
         if (!cfg.general.mixSurfaceAndUnderground && ownUnder != BiomeClassifier.categories(foreign).contains("underground")) return null;
+        // No Blend: nothing crosses, whichever side is listed and whatever the channel.
         if (BiomeClassifier.listed(m.noBlend, own) || BiomeClassifier.listed(m.noBlend, foreign)) return null;
         for (String group : m.blendOnlyWithSelf)
             if ((BiomeClassifier.match(group, own) >= 0) != (BiomeClassifier.match(group, foreign) >= 0)) return null;
+        if (surface && (!cfg.general.surfaceMixing
+                || BiomeClassifier.listed(m.noSurfaceBlend, own) || BiomeClassifier.listed(m.noSurfaceBlend, foreign))) return null;
 
         PairRule pair = null;
         for (PairRule p : cfg.pairs) {
             boolean forward = is(p.a, foreign) && is(p.b, own), backward = is(p.b, foreign) && is(p.a, own);
             if (!forward && !backward) continue;
-            boolean allowed = switch (p.mode) {
+            boolean allowed = surface ? switch (p.blockDirection == null ? BtgConfig.BlockBlend.BLEND_BOTH : p.blockDirection) {
+                case NO_BLENDING -> false;
+                case A_INTO_B -> forward;
+                case B_INTO_A -> backward;
+                case BLEND_BOTH -> true;
+            } : switch (p.mode == null ? BtgConfig.MixMode.BOTH : p.mode) {
                 case DO_NOT_BLEND -> false;
                 case A_INTO_B -> forward;
                 case B_INTO_A -> backward;
@@ -61,21 +93,32 @@ public final class Mixing {
             break;
         }
 
-        double width;
-        if (k.fluid) width = cfg.advanced.fluid.width;
-        else if (pair != null && pair.distance >= 0) width = pair.distance;
-        else width = cfg.general.mixingDistance * (BiomeClassifier.shareGroup(own, foreign) ? m.similarDistanceMultiplier : 1);
+        boolean similar = BiomeClassifier.shareGroup(own, foreign);
+        double width = switch (k.channel) {
+            case FLUID -> cfg.advanced.fluid.width;
+            case FEATURES -> featureWidth(cfg, pair, similar);
+            case TREES -> pair != null && pair.treeDistance >= 0 ? pair.treeDistance
+                    : m.treeMixingDistance >= 0 ? scaled(cfg, m.treeMixingDistance, similar) : featureWidth(cfg, pair, similar);
+            case SURFACE -> pair != null && pair.blockDistance >= 0 ? pair.blockDistance
+                    : m.surface.blockBlendingDistance >= 0 ? scaled(cfg, m.surface.blockBlendingDistance, similar) : featureWidth(cfg, pair, similar);
+        };
         width *= Transitions.climateFactor(own, foreign, cfg.advanced.climateAdaptation);
         if (width <= 0) return null;
 
-        boolean surface = cfg.general.surfaceMixing && (pair == null || pair.surfaceMixing)
-                && !BiomeClassifier.listed(m.noSurfaceBlend, own) && !BiomeClassifier.listed(m.noSurfaceBlend, foreign);
         return new Rule(width,
                 pair != null && pair.treesAndFoliageDensity != null ? pair.treesAndFoliageDensity : m.density.treesAndFoliage,
                 pair != null && pair.otherDensity != null ? pair.otherDensity : m.density.other,
                 pair != null && pair.curve != null ? pair.curve : m.distribution.curve,
-                pair != null && pair.varietyBalancing != null ? pair.varietyBalancing : m.varietyBalancing,
-                surface);
+                pair != null && pair.varietyBalancing != null ? pair.varietyBalancing : m.varietyBalancing);
+    }
+
+    private static double featureWidth(BtgConfig cfg, PairRule pair, boolean similar) {
+        return pair != null && pair.distance >= 0 ? pair.distance : scaled(cfg, cfg.general.mixingDistance, similar);
+    }
+
+    /** Global distances are widened for biomes of a similar group; a pair's own distances are taken as they are. */
+    private static double scaled(BtgConfig cfg, double distance, boolean similar) {
+        return distance * (similar ? cfg.mixing.similarDistanceMultiplier : 1);
     }
 
     /** Empty selectors in a pair match nothing (a freshly added pair does not grab every biome). */
@@ -86,8 +129,11 @@ public final class Mixing {
     /** Widest zone any rule can produce; the boundary search must look at least this far. */
     public static int maxWidth() {
         BtgConfig cfg = BtgConfig.get();
-        double w = Math.max(cfg.advanced.fluid.width, cfg.general.mixingDistance * Math.max(1, cfg.mixing.similarDistanceMultiplier));
-        for (PairRule p : cfg.pairs) w = Math.max(w, p.distance);
+        double similar = Math.max(1, cfg.mixing.similarDistanceMultiplier);
+        double w = Math.max(cfg.advanced.fluid.width, cfg.general.mixingDistance * similar);
+        w = Math.max(w, cfg.mixing.treeMixingDistance * similar);
+        w = Math.max(w, cfg.mixing.surface.blockBlendingDistance * similar);
+        for (PairRule p : cfg.pairs) w = Math.max(w, Math.max(p.distance, Math.max(p.treeDistance, p.blockDistance)));
         return (int) Math.ceil(w);
     }
 

@@ -1,6 +1,7 @@
 package net.biometransitions.worldgen;
 
 import net.biometransitions.config.BtgConfig;
+import net.biometransitions.core.BiomeClassifier;
 import net.biometransitions.core.BoundaryDetector;
 import net.biometransitions.core.FeatureCatalog;
 import net.biometransitions.core.Mixing;
@@ -67,20 +68,25 @@ public class TransitionFeature extends Feature<StepConfig> {
         ChunkPos cp = new ChunkPos(origin);
         // Ground first (first decoration step), so every later feature sees the blended surface.
         if (step == Decoration.RAW_GENERATION) return SurfaceBlending.apply(level, gen, rs, seed, cp) > 0;
-        if (!cfg.features.enabledSteps.contains(step.name())) return false;
-
-        Set<Holder<Biome>> foreign = new LinkedHashSet<>(), owns = new HashSet<>();
-        for (int sy : sections(level, cp, cfg)) {
-            var zm = BoundaryDetector.zoneMap(gen, rs, seed, cp.x, sy, cp.z);
-            for (var ns : zm.neighbours())
-                for (var n : ns) foreign.add(n.biome());
-            owns.addAll(java.util.Arrays.asList(zm.own()));
+        boolean any = false;
+        if (cfg.features.enabledSteps.contains(step.name())) {
+            // Small areas under Feature Suppression spread no features, so they are no source here.
+            Set<Holder<Biome>> foreign = new LinkedHashSet<>(), owns = new HashSet<>();
+            for (int sy : sections(level, cp, cfg)) {
+                var zm = BoundaryDetector.zoneMap(gen, rs, seed, cp.x, sy, cp.z);
+                for (var ns : zm.neighbours())
+                    for (var n : ns) if (!n.featureless()) foreign.add(n.biome());
+                owns.addAll(java.util.Arrays.asList(zm.own()));
+            }
+            if (!foreign.isEmpty()) {
+                List<Candidate> candidates = collect(level, gen, rs, seed, origin, step, foreign, owns, cfg);
+                candidates.sort(Comparator.comparingDouble(Candidate::key).reversed());
+                any = placeAll(level, gen, seed, candidates, cfg) > 0;
+            }
         }
-        if (foreign.isEmpty()) return false;
-
-        List<Candidate> candidates = collect(level, gen, rs, seed, origin, step, foreign, owns, cfg);
-        candidates.sort(Comparator.comparingDouble(Candidate::key).reversed());
-        return placeAll(level, gen, seed, candidates, cfg) > 0;
+        // Snow last, on top of everything placed (vanilla snow runs in this step as well).
+        if (step == Decoration.TOP_LAYER_MODIFICATION) any |= SurfaceBlending.snow(level, gen, rs, seed, cp) > 0;
+        return any;
     }
 
     /** Sections to look for boundaries in: the surface ones, plus every n-th one below for cave biomes. */
@@ -108,11 +114,14 @@ public class TransitionFeature extends Feature<StepConfig> {
             for (FeatureCatalog.Entry e : FeatureCatalog.all(source, step)) {
                 // Cheap rejections first: running the placement pipeline is the expensive part.
                 if (FeatureCatalog.rejectFor(e, step, null) != null) continue;
+                Mixing.Channel channel = Mixing.Channel.of(e);
                 // Density/variety factor per biome of this chunk the feature may flow into; none = skip the feature.
                 Map<Holder<Biome>, Double> factors = new HashMap<>();
                 for (Holder<Biome> own : owns) {
-                    var rule = Mixing.between(own, source, e.fluidChannel());
-                    if (rule != null && !own.value().getGenerationSettings().hasFeature(e.feature().value()))
+                    var rule = Mixing.between(own, source, channel);
+                    // A biome that has the feature itself only takes it where its own copy is suppressed (small areas).
+                    if (rule != null && (!own.value().getGenerationSettings().hasFeature(e.feature().value())
+                            || BiomeClassifier.listed(cfg.replacing.suppressFeatureBiomes, own)))
                         factors.put(own, Mixing.featureFactor(e, step, source, own, rule));
                 }
                 double maxFactor = factors.values().stream().mapToDouble(Double::doubleValue).max().orElse(0);
@@ -127,11 +136,13 @@ public class TransitionFeature extends Feature<StepConfig> {
                     while (it.hasNext()) {
                         BlockPos pos = it.next().immutable();
                         Stats.inc("attempts");
-                        var influences = Transitions.at(gen, rs, seed, pos, null, e.fluidChannel());
+                        var influences = Transitions.at(gen, rs, seed, pos, null, channel);
                         var in = influences.stream().filter(i -> i.foreign().equals(source)).findFirst().orElse(null);
                         if (in == null) continue; // outside the zone: the biome filter would have said no as well
                         Holder<Biome> target = BoundaryDetector.zoneMap(gen, rs, seed, pos).own(pos.getX(), pos.getZ());
                         String why = FeatureCatalog.rejectFor(e, step, target);
+                        if (FeatureCatalog.TARGET_HAS_IT.equals(why)
+                                && Suppression.ownCopySuppressed(gen.getBiomeSource(), rs, pos, target, e.feature().value(), e.type())) why = null;
                         if (why != null) {
                             Stats.reject(e.id(), why);
                             continue;

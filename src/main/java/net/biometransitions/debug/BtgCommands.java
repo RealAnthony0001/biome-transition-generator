@@ -8,6 +8,7 @@ import net.biometransitions.core.BoundaryDetector;
 import net.biometransitions.core.BiomeReplacer;
 import net.biometransitions.core.FeatureCatalog;
 import net.biometransitions.core.Mixing;
+import net.biometransitions.core.Mixing.Channel;
 import net.biometransitions.core.Transitions;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -64,18 +65,27 @@ public final class BtgCommands {
         if (BiomeReplacer.featuresSuppressed(gen.getBiomeSource(), rs, pos.getX(), pos.getZ(), own))
             sb.append("Small biome: own features suppressed, neighbours fill it.\n");
         if (ns.length == 0) sb.append("No biome within ").append(Mixing.maxWidth()).append(" blocks that may mix in here.");
-        var veg = Transitions.at(gen, rs, seed, pos, own, false);
-        var fluid = Transitions.at(gen, rs, seed, pos, own, true);
+        var veg = Transitions.at(gen, rs, seed, pos, own, Channel.FEATURES);
+        var trees = Transitions.at(gen, rs, seed, pos, own, Channel.TREES);
+        var fluid = Transitions.at(gen, rs, seed, pos, own, Channel.FLUID);
+        var ground = Transitions.at(gen, rs, seed, pos, own, Channel.SURFACE);
         double foreignTotal = 0;
+        java.util.Set<Holder<Biome>> listed = new java.util.HashSet<>();
         for (var n : ns) {
-            double vs = Transitions.shareOf(veg, n.biome()), fs = Transitions.shareOf(fluid, n.biome());
+            if (!listed.add(n.biome())) continue; // a nearer cell of it was listed already
+            double vs = Transitions.shareOf(veg, n.biome());
             foreignTotal += vs;
-            var rule = Mixing.between(own, n.biome(), false);
-            sb.append(String.format("→ %s %s  %.1f blocks  %s  neighbour share %.0f%%  fluid %.0f%%%n",
+            var rule = Mixing.between(own, n.biome(), Channel.FEATURES);
+            var treeRule = Mixing.between(own, n.biome(), Channel.TREES);
+            var groundRule = Mixing.between(own, n.biome(), Channel.SURFACE);
+            sb.append(String.format("→ %s %s  %.1f blocks%s%n   features: %s  share %.0f%% | trees: %s  share %.0f%% | ground: %s  share %.0f%% | fluid %.0f%%%n",
                     BiomeClassifier.id(n.biome()), BiomeClassifier.categories(n.biome()),
                     n.distance(BtgConfig.get().mixing.distribution.shape),
-                    rule == null ? "does not mix into this biome" : String.format("zone %.0f blocks, %s", rule.width(), rule.curve()),
-                    vs * 100, fs * 100));
+                    n.featureless() ? "  (small area, spreads no features)" : "",
+                    rule == null ? "do not mix in" : String.format("zone %.0f blocks, %s", rule.width(), rule.curve()), vs * 100,
+                    treeRule == null ? "do not mix in" : String.format("zone %.0f blocks", treeRule.width()), Transitions.shareOf(trees, n.biome()) * 100,
+                    groundRule == null ? "does not blend in" : String.format("zone %.0f blocks", groundRule.width()), Transitions.shareOf(ground, n.biome()) * 100,
+                    Transitions.shareOf(fluid, n.biome()) * 100));
         }
         if (ns.length > 0) sb.append(String.format("Feature ratio own/foreign: %.0f / %.0f", (1 - foreignTotal) * 100, foreignTotal * 100));
         return say(c, sb.toString().trim());
