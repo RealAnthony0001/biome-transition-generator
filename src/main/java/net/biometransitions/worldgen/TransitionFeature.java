@@ -68,13 +68,16 @@ public class TransitionFeature extends Feature<StepConfig> {
         if (step == Decoration.RAW_GENERATION) return SurfaceBlending.apply(level, gen, rs, seed, cp) > 0;
         if (!cfg.features.enabledSteps.contains(step.name())) return false;
 
-        Set<Holder<Biome>> foreign = new LinkedHashSet<>();
-        for (int sy : sections(level, cp, cfg))
-            for (var ns : BoundaryDetector.zoneMap(gen, rs, seed, cp.x, sy, cp.z).neighbours())
+        Set<Holder<Biome>> foreign = new LinkedHashSet<>(), owns = new HashSet<>();
+        for (int sy : sections(level, cp, cfg)) {
+            var zm = BoundaryDetector.zoneMap(gen, rs, seed, cp.x, sy, cp.z);
+            for (var ns : zm.neighbours())
                 for (var n : ns) foreign.add(n.biome());
+            owns.addAll(java.util.Arrays.asList(zm.own()));
+        }
         if (foreign.isEmpty()) return false;
 
-        List<Candidate> candidates = collect(level, gen, rs, seed, origin, step, foreign, cfg);
+        List<Candidate> candidates = collect(level, gen, rs, seed, origin, step, foreign, owns, cfg);
         candidates.sort(Comparator.comparingDouble(Candidate::key).reversed());
         return placeAll(level, gen, seed, candidates, cfg) > 0;
     }
@@ -95,14 +98,16 @@ public class TransitionFeature extends Feature<StepConfig> {
     }
 
     private static List<Candidate> collect(WorldGenLevel level, ChunkGenerator gen, RandomState rs, long seed, BlockPos origin,
-                                           Decoration step, Set<Holder<Biome>> foreign, BtgConfig cfg) {
+                                           Decoration step, Set<Holder<Biome>> foreign, Set<Holder<Biome>> owns, BtgConfig cfg) {
         WorldgenRandom rand = new WorldgenRandom(new XoroshiroRandomSource(seed));
         long decorationSeed = rand.setDecorationSeed(seed, origin.getX(), origin.getZ());
         List<Candidate> out = new ArrayList<>();
         var s = cfg.transition;
         for (Holder<Biome> source : foreign) {
             for (FeatureCatalog.Entry e : FeatureCatalog.all(source, step)) {
-                if (e.rejectReason() != null) continue;
+                // Cheap rejections first: running the placement pipeline is the expensive part.
+                if (FeatureCatalog.rejectFor(e, step, s, null) != null) continue;
+                if (owns.stream().allMatch(b -> b.value().getGenerationSettings().hasFeature(e.feature().value()))) continue;
                 // Frequency above 1 runs the feature's whole placement pipeline several times, so a zone can be
                 // denser than the source biome while every position still obeys the feature's own rules.
                 double shoreMax = !e.fluidChannel() && s.fluid.shoreCategories.contains(e.category()) ? Math.max(1, s.fluid.shoreFrequency) : 1;

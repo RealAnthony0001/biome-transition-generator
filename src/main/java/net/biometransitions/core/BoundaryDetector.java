@@ -12,6 +12,7 @@ import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.synth.SimplexNoise;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,8 @@ public final class BoundaryDetector {
 
     // RandomState is created once per dimension, so it identifies the level's biome sampling.
     private static final Map<RandomState, LevelData> LEVELS = Collections.synchronizedMap(new WeakHashMap<>());
+
+    private static final Neighbour[] NONE = new Neighbour[0];
 
     private BoundaryDetector() {}
 
@@ -94,9 +97,17 @@ public final class BoundaryDetector {
                         k -> gen.getBiomeSource().getNoiseBiome(qx, qy, qz, rs.sampler()));
             }
 
-        // Scan once per 4x4 quart cell (16 per chunk, not 256 columns), then shift the offsets to each column.
         Holder<Biome>[] own = new Holder[256];
         Neighbour[][] neighbours = new Neighbour[256][];
+        boolean uniform = true;
+        for (Holder<Biome> b : grid) if (!b.equals(grid[0])) { uniform = false; break; }
+        if (uniform) {
+            Arrays.fill(own, grid[0]);
+            Arrays.fill(neighbours, NONE);
+            return new ZoneMap(own, neighbours);
+        }
+
+        // Scan once per 4x4 quart cell (16 per chunk, not 256 columns), then shift the offsets to each column.
         double rangeSq = (range + 4.0) * (range + 4.0);
         for (int cx = 0; cx < 4; cx++)
             for (int cz = 0; cz < 4; cz++) {
@@ -118,7 +129,7 @@ public final class BoundaryDetector {
                         col.sort((p, q) -> Float.compare(p.dx * p.dx + p.dz * p.dz, q.dx * q.dx + q.dz * q.dz));
                         int n = (cx * 4 + ox) * 16 + cz * 4 + oz;
                         own[n] = mine;
-                        neighbours[n] = col.subList(0, Math.min(col.size(), det.maxNeighbours)).toArray(Neighbour[]::new);
+                        neighbours[n] = col.isEmpty() ? NONE : col.subList(0, Math.min(col.size(), det.maxNeighbours)).toArray(Neighbour[]::new);
                     }
             }
         return new ZoneMap(own, neighbours);

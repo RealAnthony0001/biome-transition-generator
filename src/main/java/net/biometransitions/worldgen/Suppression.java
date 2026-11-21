@@ -20,7 +20,7 @@ public final class Suppression {
 
     public static boolean suppress(PlacementContext ctx, BlockPos pos) {
         BtgConfig cfg = BtgConfig.get();
-        if (!cfg.general.enabled || ctx.topFeature().isEmpty()) return false;
+        if (!cfg.general.enabled || !cfg.transition.distribution.suppressNative || ctx.topFeature().isEmpty()) return false;
         WorldGenLevel level = ctx.getLevel();
         var server = level.getLevel();
         if (!cfg.general.dimensions.isEmpty() && !cfg.general.dimensions.contains(server.dimension().location().toString())) return false;
@@ -30,12 +30,12 @@ public final class Suppression {
         if (e == null || e.category().equals("fluid")) return false; // never remove water bodies
         var own = level.getBiome(pos);
         var step = FeatureCatalog.stepOf(own, pf);
-        if (step == null) return false;
+        if (step == null || FeatureCatalog.rejectFor(e, step, cfg.transition, null) != null) return false;
         long seed = level.getSeed();
         double share = 0;
         var s = cfg.transition;
         for (var i : Transitions.at(ctx.generator(), server.getChunkSource().randomState(), seed, pos, own, e.fluidChannel())) {
-            if (!s.distribution.suppressNative || FeatureCatalog.rejectFor(e, step, s, i.foreign()) != null) continue;
+            if (FeatureCatalog.rejectFor(e, step, s, i.foreign()) != null) continue;
             // Only make room when the neighbour brings something of the same kind; never leave bare holes.
             if (FeatureCatalog.all(i.foreign(), step).stream().noneMatch(f -> f.category().equals(e.category())
                     && FeatureCatalog.rejectFor(f, step, s, own) == null)) continue;

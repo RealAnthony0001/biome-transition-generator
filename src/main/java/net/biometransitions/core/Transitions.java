@@ -29,16 +29,18 @@ public final class Transitions {
         var s = cfg.transition;
         var dist = s.distribution;
         var zone = BoundaryDetector.zoneMap(gen, rs, seed, pos);
+        var ns = zone.neighbours(pos.getX(), pos.getZ());
+        if (ns.length == 0) return List.of();
         if (own == null) own = zone.own(pos.getX(), pos.getZ());
+        double noise = dist.noiseInfluence > 0 ? BoundaryDetector.noise(rs, seed, pos.getX(), pos.getZ(), dist.noiseScale) : 0;
+        double jitter = TransitionMath.hash01(seed, pos.getX(), 0, pos.getZ(), 0x7A11) * 2 - 1;
         List<Influence> out = new ArrayList<>(2);
         double total = 0;
-        for (var n : zone.neighbours(pos.getX(), pos.getZ())) {
+        for (var n : ns) {
             if (n.biome().equals(own)) continue;
             double d = n.distance(s.zone.shape);
             double width = (fluid ? s.fluid.width : s.zone.width) * climateFactor(own, n.biome(), s.zone.climateAdaptation);
             double intensity = fluid ? s.fluid.intensity : s.zone.intensity;
-            double noise = dist.noiseInfluence > 0 ? BoundaryDetector.noise(rs, seed, pos.getX(), pos.getZ(), dist.noiseScale) : 0;
-            double jitter = TransitionMath.hash01(seed, pos.getX(), 0, pos.getZ(), 0x7A11) * 2 - 1;
             double share = TransitionMath.foreignShare(d, width, s.zone.falloff, dist.curve, dist.customCurve,
                     dist.smoothness, dist.randomVariation, jitter, dist.noiseInfluence, noise,
                     intensity, dist.ownInfluence, dist.neighbourInfluence);
