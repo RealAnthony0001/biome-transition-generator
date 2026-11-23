@@ -1,14 +1,26 @@
-<img src="assets/icon.svg" width="64" height="64" alt="">
+<img src="assets/icon.svg" width="128" height="128" alt="">
 
 # Biome Transition Generator
 
-Mod pro **Minecraft 1.21.1 (NeoForge)**, který odstraňuje ostré hranice mezi biomy. Na obou stranách hranice vytvoří přechodovou oblast, ve které se postupně mísí stromy, tráva, květiny, keře a další prvky obou biomů. Do přechodu se rozlévá i povrch: písek z pouště do džungle, tráva z lesa do pouště.
+Mod for **Minecraft 1.21.1 (NeoForge)**, The mod blends transitions between two or more biomes by generating features from both biomes within the transition zone, with their density gradually decreasing.
+All transitions from one biome to another can be adjusted to ensure the best possible appearance.
+____________________________________________________________________________
 
-Funguje automaticky pro **všechny biomy**, vanilla i modované. Výchozí pravidla míchají jen realistické sousedy (les a pláně, tajga a sníh...), extrémně odlišné biomy nechávají oddělené.
+## What can the mod do?
 
-## Co mod umí
+- **Biome Feature mixing** up to 128 blocks away from the boundary
+- **Biome color blending** up to 64x64 blocks
+- **Biome surface blocks mixing** 
+- **Cave biome mixing**
+- **Almost everything can be customized**
+- **Biome removal if it is too small**
+- **Biome and terrain generator mods compatible**
+____________________________________________________________________________
 
-- **Detekce hranic**: hledá hranice biomů přímo ve worldgenu, i u chunků, které ještě nejsou vygenerované. Pro stejný seed dává vždy stejný výsledek. Funguje i v podzemí.
+Mod pro **Minecraft 1.21.1 (NeoForge)**, Mod míchá přechody dvou a více biomů do sebe díky tomu, že generuje features z obou biomu v přechodové vzdálenosti s ubývající hustotou
+Všechny přechody z jednoho biomu do jiného jdou upravit tak, aby vypadaly co nejlépe.
+
+
 - **Míchání prvků (features)**: bere stromy, rostliny a dekorace sousedního biomu a generuje je v přechodové oblasti. Zachovává přitom jejich původní pravidla umístění (četnost, výška, vzácnost). Vlastní prvky biomu se ve stejném poměru ředí, takže se mix opravdu přelévá z biomu A do biomu B.
 - **Plynulý přechod**: jedna křivka pokrývá celý přechod přes obě strany hranice; na hranici je poměr 50/50 (u jednosměrných dvojic 100 % souseda) a směrem do biomu klesá k nule. Tvar se nastavuje křivkou (lineární, smoothstep, ease, logaritmická, vlastní, šumová). Stromy mohou mít vlastní vzdálenost míchání.
 - **Hustota a rozmanitost**: hustota v přechodu buď plynule přechází, nebo je průměrem obou biomů. Biom s mnoha druhy prvků nepřeválcuje souseda s několika.
@@ -20,14 +32,7 @@ Funguje automaticky pro **všechny biomy**, vanilla i modované. Výchozí pravi
 - **Samostatný systém pro tekutiny**: vodní rostliny mají vlastní šířku a intenzitu. Nové jezera a prameny jsou ve výchozím stavu vypnuté a suchozemské prvky nikdy nevzniknou ve vodě.
 - **Kontrola terénu**: hlídá povrchový blok, výšku, sklon, volný prostor nad prvkem a vodu.
 - **Konfigurační GUI**: posuvník i pole pro přesnou hodnotu, tooltip s vysvětlením, příkladem a výchozí hodnotou u každého nastavení, tlačítko pro návrat na výchozí hodnotu, zvýraznění změněných nastavení, rozbalovací seznam dvojic biomů.
-- **Ladicí nástroje**: příkaz `/btg` s vizualizací hranic, statistikami a výpisem, proč byl který prvek odmítnut, a testovací Extreme Preset.
 
-## Instalace
-
-1. Nainstalujte **NeoForge pro Minecraft 1.21.1** (verze 21.1.x).
-2. Stáhněte `biometransitions-<verze>.jar` (sekce Releases, nebo si ho sestavte, viz níže).
-3. Vložte jar do složky `mods` vaší instance Minecraftu.
-4. Spusťte hru a **vytvořte nový svět** nebo prozkoumávejte nevygenerovaný terén. Mod mění jen chunky vygenerované po jeho přidání.
 
 V singleplayeru stačí mít mod ve hře. Na serveru ho nainstalujte na server; doporučujeme ho mít i na klientech (konfigurační GUI).
 
