@@ -51,7 +51,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ConfigScreen extends Screen {
     /** Section ids; names come from {@code biometransitions.gui.section.<id>}. */
     private static final String[] SECTIONS = {"general", "mixing", "pairs", "replacing", "colors", "classification",
-            "performance", "advanced", "debug"};
+            "structures", "performance", "advanced", "debug"};
     private static final String P = "biometransitions.";
     private static final int SIDEBAR = 130, ROW_H = 24, LABEL_W = 150, RESET_W = 20;
     private static final int LABEL = 0xE0E0E0, CHANGED = 0xFFE066;
@@ -78,10 +78,12 @@ public class ConfigScreen extends Screen {
 
     @Override
     protected void init() {
+        // shrink the sidebar buttons on small windows so they never reach the Save/Cancel row
+        int step = Math.max(12, Math.min(21, (height - 62) / SECTIONS.length));
         for (int i = 0; i < SECTIONS.length; i++) {
             int s = i;
             addRenderableWidget(Button.builder(gui("section." + SECTIONS[i]), b -> select(s))
-                    .bounds(6, 28 + i * 21, SIDEBAR - 12, 20).build()).active = i != section;
+                    .bounds(6, 28 + i * step, SIDEBAR - 12, Math.min(20, step - 1)).build()).active = i != section;
         }
         addRenderableWidget(Button.builder(gui("save"), b -> save()).bounds(width / 2 - 104, height - 26, 100, 20).build());
         addRenderableWidget(Button.builder(gui("cancel"), b -> onClose()).bounds(width / 2 + 4, height - 26, 100, 20).build());
@@ -104,24 +106,31 @@ public class ConfigScreen extends Screen {
     }
 
     private void fill() {
-        switch (section) {
-            case 0 -> addObject(working.general);
-            case 1 -> mixing();
-            case 2 -> pairs();
-            case 3 -> replacing();
-            case 4 -> {
+        switch (SECTIONS[section]) {
+            case "general" -> {
+                addObject(working.general);
+                addField(working.structures, "exclusionDistance");
+            }
+            case "mixing" -> mixing();
+            case "pairs" -> pairs();
+            case "replacing" -> replacing();
+            case "colors" -> {
                 note("colors");
                 addField(working.general, "colorBlendDistance");
                 addObject(working.colors);
             }
-            case 5 -> classifications();
-            case 6 -> addObject(working.performance);
-            case 7 -> {
+            case "classification" -> classifications();
+            case "structures" -> {
+                note("structures");
+                addObject(working.structures);
+            }
+            case "performance" -> addObject(working.performance);
+            case "advanced" -> {
                 addObject(working.advanced);
                 list.add(new Header(text("gui.header.feature_rules")));
                 addObject(working.features);
             }
-            case 8 -> addObject(working.debug);
+            case "debug" -> addObject(working.debug);
             default -> {}
         }
     }

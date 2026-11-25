@@ -12,6 +12,7 @@ import net.biometransitions.core.Mixing;
 import net.biometransitions.debug.BoundaryVisualizer;
 import net.biometransitions.debug.BtgCommands;
 import net.biometransitions.worldgen.StepConfig;
+import net.biometransitions.worldgen.StructureExclusion;
 import net.biometransitions.worldgen.TransitionBiomeModifier;
 import net.biometransitions.worldgen.TransitionFeature;
 import net.minecraft.core.Holder;
@@ -75,5 +76,6 @@ public final class BiomeTransitions {
         Mixing.clear();
         Density.clear();
         BiomeReplacer.clear();
+        StructureExclusion.clear();
     }
 }

@@ -188,6 +188,7 @@ public class TransitionFeature extends Feature<StepConfig> {
             List<BlockPos> prev = byFeature.computeIfAbsent(id, k -> new ArrayList<>());
             String why = spacing(c, prev);
             WorldgenRandom r = new WorldgenRandom(new LegacyRandomSource(seed ^ c.pos.asLong() * 0x9E3779B97F4A7C15L ^ id.hashCode()));
+            if (why == null && StructureExclusion.excluded(level, c.pos, c.entry.category())) why = "inside a structure";
             if (why == null) why = SurfaceRules.check(level, c.pos, c.entry, c.fluid, r);
             if (why == null && cfg.advanced.preventFeatureOverlap && SurfaceRules.overlaps(level, c.pos)) why = "overlaps another feature";
             if (why != null) {

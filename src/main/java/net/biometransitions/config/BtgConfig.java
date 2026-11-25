@@ -67,6 +67,7 @@ public final class BtgConfig {
     public Replacing replacing = new Replacing();
     public Colors colors = new Colors();
     public Classification classification = new Classification();
+    public Structures structures = new Structures();
     /** Default per-feature settings, including surface compatibility rules. */
     public FeatureSettings featureDefaults = new FeatureSettings();
     /** Partial {@link FeatureSettings} per feature category, e.g. trees need dirt below. */
@@ -206,6 +207,18 @@ public final class BtgConfig {
         public boolean sameAsMixingDistance = true;
         public List<String> reducedBiomes = new ArrayList<>();
         @Range(min = 0, max = 64, unit = "blocks") public int reducedDistance = 4;
+    }
+
+    /** Structure-Aware Feature Generation: no natural features inside structures or close around them. */
+    public static class Structures {
+        public boolean enabled = true;
+        @Range(min = 0, max = 32, unit = "blocks") public int exclusionDistance = 4;
+        public List<String> categories = new ArrayList<>(List.of("trees", "large_vegetation", "bushes", "mushrooms",
+                "rocks", "small_vegetation", "terrain_decorations"));
+        /** Underground structures: their pieces would only punch holes into cave decoration. */
+        public List<String> ignoredStructures = new ArrayList<>(List.of("minecraft:mineshaft", "minecraft:mineshaft_mesa",
+                "minecraft:stronghold", "minecraft:buried_treasure", "minecraft:ancient_city", "minecraft:trial_chambers"));
+        @Range(min = 64, max = 8192, unit = "entries") public int cacheSize = 1024;
     }
 
     public static class Advanced {

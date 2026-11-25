@@ -72,7 +72,7 @@ Vyžadují oprávnění operátora (úroveň 2).
 
 Otevření: **hlavní menu → Mods → Biome Transition Generator → Config**.
 
-- **Vlevo** je 9 sekcí, **vpravo** nastavení s posuvníkem.
+- **Vlevo** je 10 sekcí, **vpravo** nastavení s posuvníkem.
 - **Najeďte myší** na název nebo ovládací prvek: tooltip vysvětlí, co nastavení dělá, uvede příklad, **výchozí hodnotu** a u posuvníků význam levého a pravého konce. U voleb ukáže popis aktuální možnosti.
 - **Tlačítko ↺** vedle každého nastavení vrátí jen toto nastavení na výchozí hodnotu. Nastavení odlišná od výchozích mají **žlutý název s hvězdičkou**; ↺ je aktivní jen u nich. U dvojic biomů je výchozí hodnotou výchozí dvojice se stejnými skupinami A a B (jinak hodnoty nové dvojice); **Reset all pairs** obnoví celý seznam.
 - **Čísla**: posuvník a pole pro přesnou hodnotu. Některé posuvníky mají speciální konce, které se zobrazí názvem místo čísla, např. `-1` = **Overlapping Detection** nebo **Global**. U dvojic biomů mají Tree Mixing Distance a Block Blending Distance from Boundary `-1` = **= Pair Mixing Distance** (vzdálenost míchání této dvojice) a `129` = **Global** (globální nastavení).
@@ -89,13 +89,14 @@ Otevření: **hlavní menu → Mods → Biome Transition Generator → Config**.
 | Biome Replacing | `replacing` (včetně detekce malých biomů, dříve sekce Boundary Detection) |
 | Biome Color Blending | `general.colorBlendDistance` + `colors` |
 | Classifications | `classification`: pole **Biome Groups** se seznamem názvů skupin, náhled pravidel podle tagů a seznam všech biomů s vyhledáváním a výběrem skupiny (viz níže) |
+| Structure Compatibility | `structures` |
 | Performance | `performance` |
 | Advanced | `advanced` + `features` |
 | Debug | `debug` |
 
 **Classifications**: do pole **Biome Groups** napište názvy skupin oddělené čárkou (např. `forest, snowy, desert, ocean, moje_skupina`). Pod ním je seznam biomů s vyhledávacím polem: hledá se podle názvu i ID už během psaní. U každého biomu je tlačítko skupiny: kliknutí = další skupina, pravé tlačítko = předchozí, kolečko myši = procházení skupin. **Auto** znamená skupiny podle pravidel tagů; vybraná skupina je nahradí (zapíše se do `classification.overrides`). Biom s více skupinami ze souboru (např. `meadow, forest`) si je ponechá, dokud nevyberete jinou. ↺ vrátí výchozí stav biomu. Když GUI otevřete ve světě (Esc → Mods), seznam obsahuje i modované biomy a ukazuje jejich automatické skupiny; z hlavního menu jsou k dispozici jen vanilla biomy.
 
-**Max Biome Color Blending** je v General i v Biome Color Blending a **Mixing Distance** je v General i v Biome Mixing. Vždy jde o jedno nastavení, obě místa mění stejnou hodnotu.
+**Max Biome Color Blending** je v General i v Biome Color Blending, **Mixing Distance** je v General i v Biome Mixing a **Structure Feature Exclusion Distance** je v General i ve Structure Compatibility. Vždy jde o jedno nastavení, obě místa mění stejnou hodnotu.
 
 Na dedikovaném serveru upravte soubor ručně a použijte `/btg reload`.
 
@@ -275,6 +276,20 @@ Míchání barev běží na klientovi. Barvy se průměrují v uzlech mřížky 
 | `excludedFeatureTypes` | Typy prvků, které nikdy nepřecházejí, neředí se a nepotlačují (rudy, fosilie, geody, dungeony, sníh...). |
 | `typeCategories` | Typ prvku → kategorie. |
 | `keywordCategories` | Slovo v ID prvku → kategorie (první shoda). |
+
+### `structures`: Structure Compatibility
+
+**Structure-Aware Feature Generation**: přírodní prvky (stromy, rostliny, kameny...) se negenerují uvnitř struktur ani v jejich blízkosti. Ve vesnicích tak nerostou stromy, cesty nezakrývají koruny a vegetace neprorůstá budovami. Mod zjišťuje skutečné části struktury (každý dům, každý úsek cesty), ne celý obdélník kolem vesnice, takže krajina mezi domy a kolem nich zůstává normální. Platí pro vlastní prvky biomů i pro přimíchané prvky, jen v nově generovaných chunkách. Struktury se zjišťují i přes hranice chunků (až 8 chunků daleko) a jejich části se pro každý chunk načtou jen jednou, ne pro každý prvek.
+
+| Klíč | Výchozí | Rozsah | Popis |
+|---|---|---|---|
+| `enabled` | `true` | | Zapne Structure-Aware Feature Generation. |
+| `exclusionDistance` | 4 | 0–32 bloků | **Structure Feature Exclusion Distance**: jak daleko od každé části struktury se prvky negenerují. 0 = žádná vzdálenost navíc, prvky se nevygenerují jen přímo v částech struktury. Nezávislé na Mixing Distance. V GUI je v General i ve Structure Compatibility. |
+| `categories` | stromy, velké a malé rostliny, keře, houby, kameny, terénní dekorace | | Kategorie prvků, kterých se omezení týká. Tráva a květiny ve výchozím stavu ne, aby okolí vesnic nebylo holé. |
+| `ignoredStructures` | podzemní struktury (důl, pevnost, poklad, ancient city, trial chambers) | | ID nebo `#tagy` struktur, které prvky neblokují. |
+| `cacheSize` | 1024 | 64–8192 | Kolik chunků si pamatuje nalezené části struktur. |
+
+Kontrola se týká pozice, kde prvek začíná (kmen stromu). Pod částí struktury se navíc hlídá 8 bloků, aby strom rostoucí o kus níž neprorostl do domu. Vyloučené typy prvků (`features.excludedFeatureTypes`, např. rudy) se nikdy neodstraňují. V `/btg stats` jsou odmítnuté prvky jako `inside a structure` a `suppressed native: inside structure`.
 
 ### `performance`: výkon
 

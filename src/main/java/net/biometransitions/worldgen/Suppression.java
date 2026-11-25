@@ -21,8 +21,9 @@ import java.util.Set;
 
 /**
  * Hooked into the vanilla biome filter, which every biome feature passes at its final position, in every
- * chunk (also features started in a neighbouring chunk). Two jobs:
+ * chunk (also features started in a neighbouring chunk). Three jobs:
  * <ol>
+ * <li>Structure-Aware Feature Generation: no trees, plants or rocks inside structures ({@link StructureExclusion}).</li>
  * <li>Small Biomes with Feature Suppression: the biome's own features do not generate in its small areas.</li>
  * <li>Thins out a biome's own features inside the zone with the same share the foreign features come in
  * with, so the mix really shifts from A to B instead of only adding B on top.</li>
@@ -53,6 +54,10 @@ public final class Suppression {
         PlacedFeature pf = ctx.topFeature().get();
         var e = FeatureCatalog.entry(level.registryAccess().registryOrThrow(Registries.PLACED_FEATURE).wrapAsHolder(pf));
         if (e == null) return false;
+        if (!cfg.features.excludedFeatureTypes.contains(e.type()) && StructureExclusion.excluded(level, pos, e.category())) {
+            Stats.inc("suppressed native: inside structure");
+            return true;
+        }
         // The same biome the vanilla filter just accepted (fuzzy per-block biome).
         var own = level.getBiome(pos);
         var step = FeatureCatalog.stepOf(own, pf);

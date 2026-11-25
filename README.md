@@ -31,6 +31,7 @@ Všechny přechody z jednoho biomu do jiného jdou upravit tak, aby vypadaly co 
 - **Prolínání povrchu**: povrch sousedního biomu (i sněhová vrstva) se rozlévá do přechodu v přirozených skvrnách, aby jeho rostliny měly na čem růst. Má vlastní vzdálenost a u dvojic biomů vlastní směr, nezávislý na prvcích.
 - **Samostatný systém pro tekutiny**: vodní rostliny mají vlastní šířku a intenzitu. Nové jezera a prameny jsou ve výchozím stavu vypnuté a suchozemské prvky nikdy nevzniknou ve vodě.
 - **Kontrola terénu**: hlídá povrchový blok, výšku, sklon, volný prostor nad prvkem a vodu.
+- **Struktury bez stromů**: stromy, rostliny a kameny se negenerují uvnitř struktur (domy a cesty ve vesnicích) ani v nastavitelné vzdálenosti kolem nich. Zbytek krajiny zůstává beze změny.
 - **Konfigurační GUI**: posuvník i pole pro přesnou hodnotu, seznam biomů s vyhledáváním a výběrem skupiny, tooltip s vysvětlením, příkladem a výchozí hodnotou u každého nastavení, tlačítko pro návrat na výchozí hodnotu, zvýraznění změněných nastavení, rozbalovací seznam dvojic biomů.
 
 
@@ -73,6 +74,7 @@ Je potřeba **JDK 21**.
 | Generování v přechodu | `worldgen/TransitionFeature.java` |
 | Prolínání povrchu | `worldgen/SurfaceBlending.java` |
 | Ředění vlastních prvků biomu | `worldgen/Suppression.java`, `mixin/BiomeFilterMixin.java` |
+| Prvky mimo struktury | `worldgen/StructureExclusion.java` |
 | Konfigurace a GUI | `config/BtgConfig.java`, `client/ConfigScreen.java` |
 | Texty GUI (překlady) | `assets/biometransitions/lang/*.json` |
 | Příkazy a vizualizace | `debug/` |
