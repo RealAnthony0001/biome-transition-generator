@@ -49,6 +49,8 @@ Nastavení: **Mods → Biome Transition Generator → Config**, nebo soubor `con
 
 Podrobný návod k použití a popis všech nastavení: **[docs/NAVOD.md](docs/NAVOD.md)**
 
+Průzkum možností zrychlení generování (GPU, C2ME, OpenCL): [docs/OPTIMALIZACE.md](docs/OPTIMALIZACE.md)
+
 ## Sestavení ze zdrojového kódu
 
 Je potřeba **JDK 21**.
