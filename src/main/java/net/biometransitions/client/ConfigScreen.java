@@ -167,7 +167,7 @@ public class ConfigScreen extends Screen {
         for (var p : working.pairs) {
             boolean open = expanded.contains(p);
             Component name = Component.translatable(P + (open ? "gui.pair.open" : "gui.pair.closed"),
-                    p.a.isBlank() ? "?" : p.a, p.b.isBlank() ? "?" : p.b, name(p.mode), name(p.blockDirection));
+                    p.a.isBlank() ? "?" : p.a, p.b.isBlank() ? "?" : p.b);
             Button toggle = Button.builder(name, b -> {
                 if (!expanded.remove(p)) expanded.add(p);
                 refresh();

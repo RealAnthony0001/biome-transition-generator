@@ -85,7 +85,7 @@ Otevření: **hlavní menu → Mods → Biome Transition Generator → Config**.
 |---|---|
 | General | `general` |
 | Biome Mixing | `general.mixingDistance` + `mixing` + oddělená část **Surface Compatibility & Surface Block Blending** (`featureDefaults`, `mixing.surface`) |
-| Biome Boundary Mixing | `pairs` (rozbalovací seznam dvojic, tlačítka **+ Add pair**, **✕** a **Reset all pairs**). |
+| Biome Boundary Mixing | `pairs` (rozbalovací seznam dvojic, tlačítka **+ Add pair**, **✕** a **Reset all pairs**). Tlačítko dvojice ukazuje jen skupiny (`▶ taiga + snowy`); směry, vzdálenosti a ostatní nastavení jsou po rozbalení. |
 | Biome Replacing | `replacing` (včetně detekce malých biomů, dříve sekce Boundary Detection) |
 | Biome Color Blending | `general.colorBlendDistance` + `colors` |
 | Biome Classification | `classification` (náhled pravidel) |
