@@ -75,7 +75,7 @@ Otevření: **hlavní menu → Mods → Biome Transition Generator → Config**.
 - **Vlevo** je 9 sekcí, **vpravo** nastavení s posuvníkem.
 - **Najeďte myší** na název nebo ovládací prvek: tooltip vysvětlí, co nastavení dělá, uvede příklad, **výchozí hodnotu** a u posuvníků význam levého a pravého konce. U voleb ukáže popis aktuální možnosti.
 - **Tlačítko ↺** vedle každého nastavení vrátí jen toto nastavení na výchozí hodnotu. Nastavení odlišná od výchozích mají **žlutý název s hvězdičkou**; ↺ je aktivní jen u nich. U dvojic biomů je výchozí hodnotou výchozí dvojice se stejnými skupinami A a B (jinak hodnoty nové dvojice); **Reset all pairs** obnoví celý seznam.
-- **Čísla**: posuvník a pole pro přesnou hodnotu. Některé posuvníky mají speciální levý konec, např. `-1` = **Overlapping Detection** nebo **Global**.
+- **Čísla**: posuvník a pole pro přesnou hodnotu. Některé posuvníky mají speciální konce, které se zobrazí názvem místo čísla, např. `-1` = **Overlapping Detection** nebo **Global**. U dvojic biomů mají Tree Mixing Distance a Block Blending Distance from Boundary `-1` = **= Pair Mixing Distance** (vzdálenost míchání této dvojice) a `129` = **Global** (globální nastavení).
 - **Volby**: klikáním se přepíná mezi možnostmi. U dvojic biomů je navíc možnost **Global** = převzít globální nastavení.
 - **Seznamy**: hodnoty oddělené čárkou, např. `ocean, river, #minecraft:is_beach`.
 - **Save** uloží soubor a hned nastavení použije. **Cancel** změny zahodí.
@@ -85,7 +85,7 @@ Otevření: **hlavní menu → Mods → Biome Transition Generator → Config**.
 |---|---|
 | General | `general` |
 | Biome Mixing | `general.mixingDistance` + `mixing` + oddělená část **Surface Compatibility & Surface Block Blending** (`featureDefaults`, `mixing.surface`) |
-| Biome Boundary Mixing | `pairs` (rozbalovací seznam dvojic, tlačítka **+ Add pair**, **✕** a **Reset all pairs**) |
+| Biome Boundary Mixing | `pairs` (rozbalovací seznam dvojic, tlačítka **+ Add pair**, **✕** a **Reset all pairs**). |
 | Biome Replacing | `replacing` (včetně detekce malých biomů, dříve sekce Boundary Detection) |
 | Biome Color Blending | `general.colorBlendDistance` + `colors` |
 | Biome Classification | `classification` (náhled pravidel) |
@@ -123,7 +123,7 @@ Pro **Feature Density** a **Variety Balancing** patří do „Trees and Foliage�
 
 ## 6. Konfigurační soubor: všechna nastavení
 
-Soubor: `config/biometransitions.json`. Vytvoří se při prvním spuštění. Když je poškozený, mod použije výchozí hodnoty a soubor nepřepíše. Soubory z verze 0.3 (`configVersion` 4) se převedou automaticky a všechny hodnoty zůstanou (`detection` se přesune do `replacing`, `pairs[].surfaceMixing` se změní na `blockDirection`). Ještě starší soubory se uloží jako `biometransitions.json.bak` a nahradí novými.
+Soubor: `config/biometransitions.json`. Vytvoří se při prvním spuštění. Když je poškozený, mod použije výchozí hodnoty a soubor nepřepíše. Soubory z verze 0.3 (`configVersion` 4) a novější se převedou automaticky a všechny hodnoty zůstanou (`detection` se přesune do `replacing`, `pairs[].surfaceMixing` se změní na `blockDirection`, u dvojic se dřívější `treeDistance` / `blockDistance` -1 = Global změní na 129). Ještě starší soubory se uloží jako `biometransitions.json.bak` a nahradí novými.
 
 ### `general`: obecné
 
@@ -222,12 +222,12 @@ Seznam dvojic skupin biomů. Pro dvojici biomů platí **první** dvojice, kter�
 | `a`, `b` | | Skupina A a B (ID, tag nebo skupina). |
 | `mode` | `BOTH` | **Feature Direction**: `DO_NOT_BLEND`, `A_INTO_B` (prvky A se rozlévají do B), `B_INTO_A`, `BOTH`. |
 | `distance` | -1 | Vlastní vzdálenost míchání prvků v blocích. -1 = **Global** (`general.mixingDistance`). |
-| `treeDistance` | -1 | Vlastní vzdálenost míchání stromů. -1 = **Global** (`mixing.treeMixingDistance`, a když je i ta -1, `distance` této dvojice). |
+| `treeDistance` | 129 | **Tree Mixing Distance** této dvojice v blocích. **-1** = Mixing Distance této dvojice (např. `distance` 80 → stromy 80 bloků). **129** = **Global** (`mixing.treeMixingDistance`, a když je ta -1, Mixing Distance této dvojice). |
 | `treesAndFoliageDensity`, `otherDensity` | `null` | Přepsání Feature Density. `null` = Global. |
 | `curve` | `null` | Přepsání křivky rozložení. `null` = Global. |
 | `varietyBalancing` | `null` | Přepsání Variety Balancing. `null` = Global. |
 | `blockDirection` | `BLEND_BOTH` | **Block Blending Direction**, nezávislý na směru prvků: `BLEND_BOTH` (Blend Both), `A_INTO_B` (povrch A se objeví v B), `B_INTO_A`, `NO_BLENDING`. |
-| `blockDistance` | -1 | **Block Blending Distance from Boundary** pro tuto dvojici. -1 = **Global** (`mixing.surface.blockBlendingDistance`). |
+| `blockDistance` | 129 | **Block Blending Distance from Boundary** pro tuto dvojici. **-1** = Mixing Distance této dvojice. **129** = **Global** (`mixing.surface.blockBlendingDistance`). |
 
 Globální seznamy (`noBlend`, `blendOnlyWithSelf`, bariéry), `intersectionPolicy` a `similarDistanceMultiplier` platí vždy a dvojice je nepřepisují.
 

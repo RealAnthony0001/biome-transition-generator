@@ -97,10 +97,8 @@ public final class Mixing {
         double width = switch (k.channel) {
             case FLUID -> cfg.advanced.fluid.width;
             case FEATURES -> featureWidth(cfg, pair, similar);
-            case TREES -> pair != null && pair.treeDistance >= 0 ? pair.treeDistance
-                    : m.treeMixingDistance >= 0 ? scaled(cfg, m.treeMixingDistance, similar) : featureWidth(cfg, pair, similar);
-            case SURFACE -> pair != null && pair.blockDistance >= 0 ? pair.blockDistance
-                    : m.surface.blockBlendingDistance >= 0 ? scaled(cfg, m.surface.blockBlendingDistance, similar) : featureWidth(cfg, pair, similar);
+            case TREES -> channelWidth(cfg, pair, pair == null ? PairRule.GLOBAL : pair.treeDistance, m.treeMixingDistance, similar);
+            case SURFACE -> channelWidth(cfg, pair, pair == null ? PairRule.GLOBAL : pair.blockDistance, m.surface.blockBlendingDistance, similar);
         };
         width *= Transitions.climateFactor(own, foreign, cfg.advanced.climateAdaptation);
         if (width <= 0) return null;
@@ -110,6 +108,16 @@ public final class Mixing {
                 pair != null && pair.otherDensity != null ? pair.otherDensity : m.density.other,
                 pair != null && pair.curve != null ? pair.curve : m.distribution.curve,
                 pair != null && pair.varietyBalancing != null ? pair.varietyBalancing : m.varietyBalancing);
+    }
+
+    /**
+     * Tree or block distance: a pair's own value, -1 = the pair's Mixing Distance, 129 = the global setting
+     * (whose -1 means the Mixing Distance as well).
+     */
+    private static double channelWidth(BtgConfig cfg, PairRule pair, int pairValue, int global, boolean similar) {
+        if (pair != null && pairValue == PairRule.PAIR_MIXING) return featureWidth(cfg, pair, similar);
+        if (pair != null && pairValue >= 0 && pairValue < PairRule.GLOBAL) return pairValue;
+        return global >= 0 ? scaled(cfg, global, similar) : featureWidth(cfg, pair, similar);
     }
 
     private static double featureWidth(BtgConfig cfg, PairRule pair, boolean similar) {
@@ -133,7 +141,11 @@ public final class Mixing {
         double w = Math.max(cfg.advanced.fluid.width, cfg.general.mixingDistance * similar);
         w = Math.max(w, cfg.mixing.treeMixingDistance * similar);
         w = Math.max(w, cfg.mixing.surface.blockBlendingDistance * similar);
-        for (PairRule p : cfg.pairs) w = Math.max(w, Math.max(p.distance, Math.max(p.treeDistance, p.blockDistance)));
+        for (PairRule p : cfg.pairs) {
+            w = Math.max(w, p.distance);
+            if (p.treeDistance < PairRule.GLOBAL) w = Math.max(w, p.treeDistance);
+            if (p.blockDistance < PairRule.GLOBAL) w = Math.max(w, p.blockDistance);
+        }
         return (int) Math.ceil(w);
     }
 

@@ -55,7 +55,7 @@ public final class BtgConfig {
     private static volatile BtgConfig current = new BtgConfig();
 
     /** Current file format. Older files from {@link #MIGRATABLE} on are migrated, anything older is replaced (kept as .bak). */
-    public static final int VERSION = 5;
+    public static final int VERSION = 6;
     private static final int MIGRATABLE = 4;
     public int configVersion = 0; // missing in old files = 0; set on save
 
@@ -140,17 +140,22 @@ public final class BtgConfig {
 
     /** Feature mixing between two biome groups. */
     public static class PairRule {
+        /** Tree and block distances: this value = take the global setting. */
+        public static final int GLOBAL = 129;
+        /** Tree and block distances: this value = take this pair's Mixing Distance. */
+        public static final int PAIR_MIXING = -1;
+
         public String a = "";
         public String b = "";
         public MixMode mode = MixMode.BOTH;
         @Range(min = -1, max = 128, unit = "blocks", minLabel = "global") public int distance = -1;
-        @Range(min = -1, max = 128, unit = "blocks", minLabel = "global") public int treeDistance = -1;
+        @Range(min = -1, max = 129, unit = "blocks", minLabel = "pair_mixing", maxLabel = "global") public int treeDistance = GLOBAL;
         @Inherit public DensityMode treesAndFoliageDensity;
         @Inherit public DensityMode otherDensity;
         @Inherit public Curve curve;
         @Inherit public VarietyBalancing varietyBalancing;
         public BlockBlend blockDirection = BlockBlend.BLEND_BOTH;
-        @Range(min = -1, max = 128, unit = "blocks", minLabel = "global") public int blockDistance = -1;
+        @Range(min = -1, max = 129, unit = "blocks", minLabel = "pair_mixing", maxLabel = "global") public int blockDistance = GLOBAL;
 
         public PairRule() {}
 
@@ -429,7 +434,7 @@ public final class BtgConfig {
                     JsonObject root = tree.getAsJsonObject();
                     int version = root.has("configVersion") ? root.get("configVersion").getAsInt() : 0;
                     if (version >= MIGRATABLE) {
-                        ConfigMigration.migrate(root);
+                        ConfigMigration.migrate(root, version);
                         BtgConfig read = GSON.fromJson(root, BtgConfig.class);
                         if (read != null) cfg = read;
                     } else {
