@@ -258,7 +258,7 @@ Oblast je souvislá plocha quartů, které odpovídají stejné položce seznamu
 | `reducedBiomes` | `[]` | | Biomy s kratší vzdáleností míchání barev (např. bažiny, aby jejich tmavá voda zůstala ostrá). |
 | `reducedDistance` | 4 | 0–64 bloků | Vzdálenost pro `reducedBiomes`. |
 
-Míchání barev běží na klientovi. Barvy se průměrují v uzlech mřížky biomů (4 × 4 bloky) a každý blok je plynule interpoluje, takže vzniká hladký přechod bez „zrnění“. Uzly se počítají jednou a sdílí je 16 sloupců. Když ještě nejsou načtené okolní chunky, chybějící vzorky se vynechají a dotčené sekce se po jejich načtení překreslí. Platí pro trávu, listí, vodu a další barvy bloků podle biomu. Mody, které nahrazují vykreslování bloků vlastním (např. Sodium/Embeddium), mohou mít vlastní míchání barev a tímto nastavením se neřídí.
+Míchání barev běží na klientovi. Barvy se průměrují v uzlech mřížky biomů (4 × 4 bloky) a každý blok je plynule interpoluje, takže vzniká hladký přechod bez „zrnění“. Uzly se počítají jednou a sdílí je 16 sloupců. Když ještě nejsou načtené okolní chunky, chybějící vzorky se vynechají a dotčené sekce se po jejich načtení překreslí. Platí pro trávu, listí, vodu a další barvy bloků podle biomu. Funguje i se **Sodiem** (0.6 a novější): Sodium počítá barvy terénu ve vlastním vykreslování a mod do něj dodá stejné smíchané barvy jako bez Sodia. Když je míchání barev vypnuté (vzdálenost 0 nebo vypnutý mod), použije se beze změny míchání Sodia podle volby Biome Blend. Bez Sodia se nic nemění. Jiné mody s vlastním vykreslováním (např. Embeddium) se tímto nastavením neřídí.
 
 ### `classification`: skupiny biomů
 

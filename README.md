@@ -27,7 +27,7 @@ Všechny přechody z jednoho biomu do jiného jdou upravit tak, aby vypadaly co 
 - **Pravidla míchání**: biomy, které se nemísí vůbec (oceán, řeka, pláž), mísí se jen se svou skupinou (poušť, badlands), fungují jako bariéra (řeka), a pravidla pro dvojice skupin se směrem (les se rozlévá do plání, ne naopak) a vlastní vzdáleností.
 - **Šířka podle podobnosti**: podobné biomy (dva lesy) se mísí na širší oblasti, odlišné klima zužuje přechod.
 - **Nahrazování malých biomů**: malé oceány uprostřed říční sítě se změní na řeku. Malým biomům lze také jen potlačit vlastní prvky.
-- **Míchání barev**: tráva, listí a voda se plynule prolínají na větší vzdálenost než ve vanille, bez výrazné ztráty výkonu.
+- **Míchání barev**: tráva, listí a voda se plynule prolínají na větší vzdálenost než ve vanille, bez výrazné ztráty výkonu. Funguje i se Sodiem.
 - **Prolínání povrchu**: povrch sousedního biomu (i sněhová vrstva) se rozlévá do přechodu v přirozených skvrnách, aby jeho rostliny měly na čem růst. Má vlastní vzdálenost a u dvojic biomů vlastní směr, nezávislý na prvcích.
 - **Samostatný systém pro tekutiny**: vodní rostliny mají vlastní šířku a intenzitu. Nové jezera a prameny jsou ve výchozím stavu vypnuté a suchozemské prvky nikdy nevzniknou ve vodě.
 - **Kontrola terénu**: hlídá povrchový blok, výšku, sklon, volný prostor nad prvkem a vodu.
@@ -67,7 +67,7 @@ Je potřeba **JDK 21**.
 | Matematika přechodu (křivky, poměr, klima) | `core/TransitionMath.java`, `core/Transitions.java` |
 | Pravidla míchání, hustota, rozmanitost | `core/Mixing.java`, `core/Density.java` |
 | Malé biomy a jejich nahrazování | `core/BiomeReplacer.java`, `mixin/NoiseBasedChunkGeneratorMixin.java` |
-| Míchání barev | `client/ColorBlending.java`, `mixin/ClientLevelMixin.java` |
+| Míchání barev | `client/ColorBlending.java`, `mixin/ClientLevelMixin.java`, se Sodiem `mixin/compat/SodiumLevelSliceMixin.java` |
 | Sběr a kategorizace prvků | `core/FeatureCatalog.java` |
 | Kontrola terénu | `core/SurfaceRules.java` |
 | Kategorie biomů | `core/BiomeClassifier.java` |
