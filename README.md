@@ -31,7 +31,7 @@ Všechny přechody z jednoho biomu do jiného jdou upravit tak, aby vypadaly co 
 - **Prolínání povrchu**: povrch sousedního biomu (i sněhová vrstva) se rozlévá do přechodu v přirozených skvrnách, aby jeho rostliny měly na čem růst. Má vlastní vzdálenost a u dvojic biomů vlastní směr, nezávislý na prvcích.
 - **Samostatný systém pro tekutiny**: vodní rostliny mají vlastní šířku a intenzitu. Nové jezera a prameny jsou ve výchozím stavu vypnuté a suchozemské prvky nikdy nevzniknou ve vodě.
 - **Kontrola terénu**: hlídá povrchový blok, výšku, sklon, volný prostor nad prvkem a vodu.
-- **Konfigurační GUI**: posuvník i pole pro přesnou hodnotu, tooltip s vysvětlením, příkladem a výchozí hodnotou u každého nastavení, tlačítko pro návrat na výchozí hodnotu, zvýraznění změněných nastavení, rozbalovací seznam dvojic biomů.
+- **Konfigurační GUI**: posuvník i pole pro přesnou hodnotu, seznam biomů s vyhledáváním a výběrem skupiny, tooltip s vysvětlením, příkladem a výchozí hodnotou u každého nastavení, tlačítko pro návrat na výchozí hodnotu, zvýraznění změněných nastavení, rozbalovací seznam dvojic biomů.
 
 
 V singleplayeru stačí mít mod ve hře. Na serveru ho nainstalujte na server; doporučujeme ho mít i na klientech (konfigurační GUI).

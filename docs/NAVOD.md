@@ -88,10 +88,12 @@ Otevření: **hlavní menu → Mods → Biome Transition Generator → Config**.
 | Biome Boundary Mixing | `pairs` (rozbalovací seznam dvojic, tlačítka **+ Add pair**, **✕** a **Reset all pairs**). Tlačítko dvojice ukazuje jen skupiny (`▶ taiga + snowy`); směry, vzdálenosti a ostatní nastavení jsou po rozbalení. |
 | Biome Replacing | `replacing` (včetně detekce malých biomů, dříve sekce Boundary Detection) |
 | Biome Color Blending | `general.colorBlendDistance` + `colors` |
-| Biome Classification | `classification` (náhled pravidel) |
+| Classifications | `classification`: pole **Biome Groups** se seznamem názvů skupin, náhled pravidel podle tagů a seznam všech biomů s vyhledáváním a výběrem skupiny (viz níže) |
 | Performance | `performance` |
 | Advanced | `advanced` + `features` |
 | Debug | `debug` |
+
+**Classifications**: do pole **Biome Groups** napište názvy skupin oddělené čárkou (např. `forest, snowy, desert, ocean, moje_skupina`). Pod ním je seznam biomů s vyhledávacím polem: hledá se podle názvu i ID už během psaní. U každého biomu je tlačítko skupiny: kliknutí = další skupina, pravé tlačítko = předchozí, kolečko myši = procházení skupin. **Auto** znamená skupiny podle pravidel tagů; vybraná skupina je nahradí (zapíše se do `classification.overrides`). Biom s více skupinami ze souboru (např. `meadow, forest`) si je ponechá, dokud nevyberete jinou. ↺ vrátí výchozí stav biomu. Když GUI otevřete ve světě (Esc → Mods), seznam obsahuje i modované biomy a ukazuje jejich automatické skupiny; z hlavního menu jsou k dispozici jen vanilla biomy.
 
 **Max Biome Color Blending** je v General i v Biome Color Blending a **Mixing Distance** je v General i v Biome Mixing. Vždy jde o jedno nastavení, obě místa mění stejnou hodnotu.
 
@@ -261,7 +263,8 @@ Míchání barev běží na klientovi. Barvy se průměrují v uzlech mřížky 
 
 | Klíč | Popis |
 |---|---|
-| `overrides` | ID biomu → seznam skupin. Má přednost před tagy. |
+| `groups` | Názvy skupin nabízené v GUI Classifications (výchozí jsou všechny vestavěné skupiny). |
+| `overrides` | ID biomu → seznam skupin. Má přednost před tagy. V GUI se nastavuje tlačítkem skupiny u biomu. |
 | `tagRules` | Pravidla `{ "tags": [...], "categories": [...] }`. Biom musí mít **všechny** tagy a dostane skupiny ze všech pravidel, která na něj sedí. |
 
 ### `features`: pravidla pro prvky (Advanced)

@@ -15,6 +15,13 @@ import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
+import net.biometransitions.core.BiomeClassifier;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 
@@ -28,6 +35,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -50,6 +58,7 @@ public class ConfigScreen extends Screen {
     /** Freshly constructed objects per config class: the source of every default value. */
     private static final Map<Class<?>, Object> DEFAULTS = new ConcurrentHashMap<>();
     private static final List<BtgConfig.PairRule> DEFAULT_PAIRS = BtgConfig.defaultPairs();
+    private static final Map<String, List<String>> DEFAULT_OVERRIDES = new BtgConfig.Classification().overrides;
 
     private final Screen parent;
     private final BtgConfig working = BtgConfig.get().copy();
@@ -58,6 +67,9 @@ public class ConfigScreen extends Screen {
     /** Scroll position to restore after the next rebuild, or -1. */
     private double keepScroll = -1;
     private final java.util.Set<BtgConfig.PairRule> expanded = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    /** Classifications: current search text, and the list size before the biome rows (they are rebuilt on every keystroke). */
+    private String search = "";
+    private int biomeRowsStart;
 
     public ConfigScreen(Screen parent) {
         super(Component.translatable(P + "gui.title"));
@@ -102,13 +114,7 @@ public class ConfigScreen extends Screen {
                 addField(working.general, "colorBlendDistance");
                 addObject(working.colors);
             }
-            case 5 -> {
-                note("classification");
-                addObject(working.classification);
-                list.add(new Header(text("gui.header.tag_rules")));
-                for (var r : working.classification.tagRules)
-                    list.add(new Note(text("gui.tag_rule", String.join(" + ", r.tags), String.join(", ", r.categories))));
-            }
+            case 5 -> classifications();
             case 6 -> addObject(working.performance);
             case 7 -> {
                 addObject(working.advanced);
@@ -159,6 +165,193 @@ public class ConfigScreen extends Screen {
         addField(r, "overlapMultiplier");
         header("replacing");
         addObject(r, "smallBiomeDetection", "overlapMultiplier");
+    }
+
+    // ---- classifications ----
+
+    /** A biome of the list: its id, display name and, inside a world, its holder (for the groups from tags). */
+    private record BiomeInfo(String id, String name, Holder<Biome> holder) {}
+
+    private List<BiomeInfo> biomes;
+
+    /**
+     * Classifications: group names in a text field, then every biome with a group selector, filtered by the
+     * search bar. Inside a world the list comes from the world's registry (modded biomes included); from the
+     * main menu only vanilla biomes and biomes that already have an override are known.
+     */
+    private void classifications() {
+        var c = working.classification;
+        note("classification");
+        header("groups");
+        note("groups");
+        addField(c, "groups");
+        addObject(c, "groups", "overrides");
+        header("tag_rules");
+        for (var r : c.tagRules)
+            list.add(new Note(text("gui.tag_rule", String.join(" + ", r.tags), String.join(", ", r.categories))));
+        header("biomes");
+        note(minecraft.level != null ? "biomes.world" : "biomes.menu");
+        EditBox box = new EditBox(font, 0, 0, 260, 18, gui("search"));
+        box.setMaxLength(256);
+        box.setValue(search);
+        box.setHint(gui("search.hint"));
+        box.setTooltip(Tooltip.create(gui("search.tooltip")));
+        box.setResponder(s -> {
+            search = s;
+            list.truncate(biomeRowsStart);
+            addBiomeRows();
+            list.setScrollAmount(list.getScrollAmount()); // clamp to the shorter list
+        });
+        list.add(new Row(text("gui.search"), List.of(box), null, null, LABEL_W));
+        biomeRowsStart = list.children().size();
+        addBiomeRows();
+    }
+
+    private void addBiomeRows() {
+        String q = search.trim().toLowerCase(Locale.ROOT);
+        int shown = 0;
+        for (BiomeInfo b : biomes()) {
+            if (!q.isEmpty() && !b.id.toLowerCase(Locale.ROOT).contains(q) && !b.name.toLowerCase(Locale.ROOT).contains(q)) continue;
+            list.add(new BiomeRow(b));
+            shown++;
+        }
+        if (shown == 0) list.add(new Note(text("gui.search.none")));
+    }
+
+    /** Biomes of the open world, or the vanilla ones from the main menu; plus every biome with an override. */
+    private List<BiomeInfo> biomes() {
+        if (biomes != null) return biomes;
+        Map<String, BiomeInfo> out = new TreeMap<>();
+        if (minecraft.level != null) {
+            minecraft.level.registryAccess().registryOrThrow(Registries.BIOME).holders()
+                    .forEach(h -> out.put(h.key().location().toString(), info(h.key().location(), h)));
+        } else {
+            for (Field f : Biomes.class.getFields())
+                if (Modifier.isStatic(f.getModifiers()) && get(null, f) instanceof ResourceKey<?> k)
+                    out.put(k.location().toString(), info(k.location(), null));
+        }
+        for (String id : working.classification.overrides.keySet()) {
+            ResourceLocation rl = ResourceLocation.tryParse(id);
+            if (rl != null) out.putIfAbsent(id, info(rl, null));
+        }
+        return biomes = List.copyOf(out.values());
+    }
+
+    private static BiomeInfo info(ResourceLocation id, Holder<Biome> holder) {
+        String key = id.toLanguageKey("biome");
+        return new BiomeInfo(id.toString(), I18n.exists(key) ? I18n.get(key) : id.getPath(), holder);
+    }
+
+    /** What the group selector shows for a biome's groups (null = automatic, from tag rules). */
+    private String groupsText(BiomeInfo b, List<String> groups) {
+        if (groups != null) return String.join(", ", groups);
+        return b.holder == null ? text("gui.groups.auto")
+                : text("gui.groups.auto_with", String.join(", ", BiomeClassifier.byTags(b.holder, working.classification)));
+    }
+
+    /** One biome: name, group selector, reset, and the id in grey. */
+    private class BiomeRow extends Row {
+        private final BiomeInfo biome;
+
+        BiomeRow(BiomeInfo b) {
+            this(b, new BiomeGroups(b));
+        }
+
+        private BiomeRow(BiomeInfo b, BiomeGroups setting) {
+            super(font.plainSubstrByWidth(b.name, LABEL_W - 16), List.of(), text("gui.biome.tooltip", b.name, b.id), setting, LABEL_W);
+            this.biome = b;
+            addWidget(new GroupButton(b, setting));
+        }
+
+        @Override
+        public void render(GuiGraphics g, int index, int top, int left, int w, int h, int mouseX, int mouseY, boolean hovered, float pt) {
+            super.render(g, index, top, left, w, h, mouseX, mouseY, hovered, pt);
+            g.drawString(font, "§8" + biome.id, widgetsEnd + 2, top + 6, 0xFFFFFF);
+        }
+    }
+
+    /** A biome's entry in {@code classification.overrides}: missing = automatic groups from the tag rules. */
+    private final class BiomeGroups implements Setting {
+        private final BiomeInfo biome;
+
+        BiomeGroups(BiomeInfo b) { this.biome = b; }
+
+        List<String> value() { return working.classification.overrides.get(biome.id); }
+
+        void set(List<String> groups) {
+            if (groups == null) working.classification.overrides.remove(biome.id);
+            else working.classification.overrides.put(biome.id, new ArrayList<>(groups));
+        }
+
+        @Override
+        public boolean modified() { return !Objects.equals(value(), DEFAULT_OVERRIDES.get(biome.id)); }
+
+        @Override
+        public void reset() { set(DEFAULT_OVERRIDES.get(biome.id)); }
+
+        @Override
+        public String defaultText() { return groupsText(biome, DEFAULT_OVERRIDES.get(biome.id)); }
+    }
+
+    /**
+     * Group selector: click = next group, right click = previous, mouse wheel scrolls through them. Options are
+     * Auto (tag rules) and every name from the group field; a multi-group override stays selectable until left.
+     */
+    private class GroupButton extends Button {
+        private final BiomeInfo biome;
+        private final BiomeGroups setting;
+
+        GroupButton(BiomeInfo b, BiomeGroups setting) {
+            super(0, 0, 200, 20, Component.empty(), btn -> {}, DEFAULT_NARRATION);
+            this.biome = b;
+            this.setting = setting;
+            update();
+        }
+
+        private List<List<String>> options() {
+            List<List<String>> out = new ArrayList<>();
+            out.add(null);
+            for (String g : working.classification.groups) if (!g.isBlank()) out.add(List.of(g.trim()));
+            List<String> current = setting.value();
+            if (current != null && !out.contains(current)) out.add(1, current);
+            return out;
+        }
+
+        private void step(int dir) {
+            List<List<String>> options = options();
+            int i = options.indexOf(setting.value());
+            setting.set(options.get(Math.floorMod(i + dir, options.size())));
+            update();
+        }
+
+        private void update() {
+            String shown = groupsText(biome, setting.value());
+            setMessage(Component.literal(font.plainSubstrByWidth(shown, getWidth() - 8)));
+            setTooltip(Tooltip.create(Component.literal(text("gui.groups.tooltip", biome.name, groupsText(biome, setting.value())))));
+        }
+
+        @Override
+        public void onPress() { step(1); }
+
+        @Override
+        protected boolean isValidClickButton(int button) { return button == 0 || button == 1; }
+
+        @Override
+        public boolean mouseClicked(double mx, double my, int button) {
+            if (button == 1 && active && visible && isMouseOver(mx, my)) {
+                playDownSound(Minecraft.getInstance().getSoundManager());
+                step(-1);
+                return true;
+            }
+            return super.mouseClicked(mx, my, button);
+        }
+
+        @Override
+        public boolean mouseScrolled(double mx, double my, double sx, double sy) {
+            if (!active || !visible || !isMouseOver(mx, my) || sy == 0) return false;
+            step(sy > 0 ? -1 : 1);
+            return true;
+        }
     }
 
     /** Biome Boundary Mixing: one expandable entry per pair of groups. */
@@ -432,13 +625,27 @@ public class ConfigScreen extends Screen {
         });
     }
 
-    /** One setting: its value, its default, and resetting it. */
-    private record Binding(Object owner, Field field) {
+    /** Something a row edits, with a default to compare against and reset to. */
+    private interface Setting {
+        boolean modified();
+
+        void reset();
+
+        /** The default value as the GUI shows it. */
+        String defaultText();
+    }
+
+    /** One config field: its value, its default, and resetting it. */
+    private record Binding(Object owner, Field field) implements Setting {
+        @Override
+        public String defaultText() { return describe(defaultValue(), field); }
+
         Object value() { return get(owner, field); }
 
         Object defaultValue() { return get(defaultsOf(owner), field); }
 
-        boolean modified() {
+        @Override
+        public boolean modified() {
             Object v = value(), d = defaultValue();
             if (v instanceof Double a && d instanceof Double b) return Math.abs(a - b) > 1e-9;
             if (v == null || d == null || v instanceof Number || v instanceof Boolean || v instanceof String || v instanceof Enum<?>)
@@ -448,7 +655,8 @@ public class ConfigScreen extends Screen {
         }
 
         /** Restores the default, as a copy so later edits never touch the default object. */
-        void reset() {
+        @Override
+        public void reset() {
             Object d = defaultValue();
             Object copy = d == null || field.getType().isPrimitive() || field.getType().isEnum() || d instanceof String ? d
                     : BtgConfig.GSON.fromJson(BtgConfig.GSON.toJsonTree(d, field.getGenericType()), field.getGenericType());
@@ -463,6 +671,19 @@ public class ConfigScreen extends Screen {
 
         void add(Row r) { addEntry(r); }
 
+        /** Removes every row from index {@code size} on. */
+        void truncate(int size) {
+            while (children().size() > size) removeEntry(children().get(children().size() - 1));
+        }
+
+        /** The mouse wheel goes to a row widget that uses it (group selectors) before it scrolls the list. */
+        @Override
+        public boolean mouseScrolled(double mx, double my, double sx, double sy) {
+            Row row = getEntryAtPosition(mx, my);
+            if (row != null && row.mouseScrolled(mx, my, sx, sy)) return true;
+            return super.mouseScrolled(mx, my, sx, sy);
+        }
+
         @Override
         public int getRowWidth() { return width - 24; }
 
@@ -474,7 +695,7 @@ public class ConfigScreen extends Screen {
         final String label;
         final List<AbstractWidget> widgets;
         final String tip;
-        final Binding binding;
+        final Setting binding;
         final Button reset;
         final int indent;
         /** x where the widgets ended in the last render pass. */
@@ -484,7 +705,7 @@ public class ConfigScreen extends Screen {
          * @param binding the setting this row edits (null = no reset button)
          * @param indent  where the widgets start, relative to the row
          */
-        Row(String label, List<AbstractWidget> widgets, String tip, Binding binding, int indent) {
+        Row(String label, List<AbstractWidget> widgets, String tip, Setting binding, int indent) {
             this.label = label;
             this.widgets = new ArrayList<>(widgets);
             this.tip = tip;
@@ -497,7 +718,7 @@ public class ConfigScreen extends Screen {
                     binding.reset();
                     refresh();
                 }).size(RESET_W, 20).build();
-                reset.setTooltip(Tooltip.create(gui("reset.tooltip", describe(binding.defaultValue(), binding.field()))));
+                reset.setTooltip(Tooltip.create(gui("reset.tooltip", binding.defaultText())));
             } else reset = null;
         }
 

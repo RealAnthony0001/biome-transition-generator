@@ -32,6 +32,11 @@ public final class BiomeClassifier {
         var c = BtgConfig.get().classification;
         List<String> override = c.overrides.get(id(biome));
         if (override != null) return List.copyOf(override);
+        return byTags(biome, c);
+    }
+
+    /** Groups the tag rules of {@code c} give the biome (ignoring overrides); "other" when none match. */
+    public static List<String> byTags(Holder<Biome> biome, BtgConfig.Classification c) {
         List<String> out = new ArrayList<>();
         for (var rule : c.tagRules) {
             if (rule.tags.isEmpty() || !rule.tags.stream().allMatch(t -> hasTag(biome, t))) continue;

@@ -297,6 +297,10 @@ public final class BtgConfig {
     }
 
     public static class Classification {
+        /** Group names offered in the Classifications GUI; any name typed here can be assigned to biomes. */
+        public List<String> groups = new ArrayList<>(List.of("forest", "dense_forest", "sparse_forest", "plains", "savanna",
+                "meadow", "mountain", "hills", "desert", "badlands", "swamp", "jungle", "taiga", "snowy", "beach", "river",
+                "ocean", "deep_ocean", "underground", "other"));
         /** Biome id -> categories (groups); replaces the tag rules for that biome. Special groups: all, surface, underground. */
         public Map<String, List<String>> overrides = new LinkedHashMap<>(Map.of(
                 "minecraft:meadow", List.of("meadow"),
