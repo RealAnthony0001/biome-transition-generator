@@ -74,6 +74,7 @@ Je potřeba **JDK 21**.
 | Prolínání povrchu | `worldgen/SurfaceBlending.java` |
 | Ředění vlastních prvků biomu | `worldgen/Suppression.java`, `mixin/BiomeFilterMixin.java` |
 | Konfigurace a GUI | `config/BtgConfig.java`, `client/ConfigScreen.java` |
+| Texty GUI (překlady) | `assets/biometransitions/lang/*.json` |
 | Příkazy a vizualizace | `debug/` |
 
 Mod přidá do každého biomu jeden vlastní prvek pro každou fázi generování, vždy na začátek seznamu. Pro každý chunk projde prvky sousedních biomů, pustí je jejich vlastními pravidly umístění a místo kontroly biomu použije poměr přechodu. Každý chunk generuje jen ze svých vlastních pozic, takže se nic negeneruje dvakrát.

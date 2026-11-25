@@ -79,6 +79,7 @@ Otevření: **hlavní menu → Mods → Biome Transition Generator → Config**.
 - **Volby**: klikáním se přepíná mezi možnostmi. U dvojic biomů je navíc možnost **Global** = převzít globální nastavení.
 - **Seznamy**: hodnoty oddělené čárkou, např. `ocean, river, #minecraft:is_beach`.
 - **Save** uloží soubor a hned nastavení použije. **Cancel** změny zahodí.
+- **Jazyk**: všechny texty GUI (názvy, tooltipy, sekce, tlačítka) jsou v jazykových souborech `assets/biometransitions/lang/<jazyk>.json` a řídí se jazykem nastaveným v Minecraftu. Výchozí je angličtina (`en_us.json`). Texty lze upravit nebo přeložit resource packem se souborem stejného jména (např. `cs_cz.json`); chybějící klíče se zobrazí anglicky.
 
 | Sekce v GUI | Část configu |
 |---|---|
